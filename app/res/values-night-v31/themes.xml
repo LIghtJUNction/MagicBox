@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MagicBox" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowSplashScreenBackground">#141619</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:navigationBarColor">#141619</item>
+        <item name="android:statusBarColor">#141619</item>
+    </style>
+</resources>

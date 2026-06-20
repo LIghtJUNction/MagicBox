@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="magicbox_background">#F7F4EF</color>
+    <color name="magicbox_background_dark">#141619</color>
+</resources>
