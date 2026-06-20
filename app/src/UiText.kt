@@ -1,0 +1,435 @@
+package com.github.lightjunction.magicbox
+
+data class UiText(
+    val dashboard: String,
+    val dashboardSubtitle: String,
+    val networkSpeed: String,
+    val waitingLiveSamples: String,
+    val mode: String,
+    val core: String,
+    val notReported: String,
+    val health: String,
+    val sync: String,
+    val checking: String,
+    val ready: String,
+    val needsRoot: String,
+    val running: String,
+    val run: String,
+    val moduleHealth: String,
+    val waitingCliHealth: String,
+    val check: String,
+    val ok: String,
+    val fail: String,
+    val warn: String,
+    val idle: String,
+    val done: String,
+    val busy: String,
+    val control: String,
+    val checkingService: String,
+    val start: String,
+    val restart: String,
+    val stop: String,
+    val auto: String,
+    val applyConfig: String,
+    val closeConns: String,
+    val rules: String,
+    val rulesSubtitle: String,
+    val add: String,
+    val reload: String,
+    val apply: String,
+    val lastWriteCommand: String,
+    val customRouteSuffixes: String,
+    val runtimeRuleSets: String,
+    val domainPlaceholder: String,
+    val filterDomain: String,
+    val domainSuffix: String,
+    val apps: String,
+    val appsSubtitle: String,
+    val blacklist: String,
+    val whitelist: String,
+    val policy: String,
+    val loadingAppPolicy: String,
+    val installedPackages: String,
+    val searchPackage: String,
+    val search: String,
+    val lastAppCommand: String,
+    val remove: String,
+    val recommendedBypass: String,
+    val noRecommendedBypass: String,
+    val blacklistHint: String,
+    val whitelistHint: String,
+    val filterPolicy: String,
+    val alreadyInPolicy: String,
+    val installedPackage: String,
+    val packagePlaceholder: String,
+    val live: String,
+    val up: String,
+    val down: String,
+    val tools: String,
+    val toolsSubtitle: String,
+    val language: String,
+    val background: String,
+    val backgroundHint: String,
+    val subscription: String,
+    val loadingSubscription: String,
+    val updateSub: String,
+    val updateAll: String,
+    val diagnostics: String,
+    val diagnose: String,
+    val support: String,
+    val ecapture: String,
+    val mcpLogs: String,
+    val diffIssue: String,
+    val draft: String,
+    val toolOutput: String,
+    val checkingUpdates: String,
+    val contactingGithub: String,
+    val checkGithubReleases: String,
+    val githubReleases: String,
+    val openApkPage: String,
+    val open: String,
+    val attribution: String,
+    val attributionText: String,
+    val routingTable: String,
+    val waitingRouteList: String,
+    val backendBridge: String,
+    val checkingModule: String,
+    val module: String,
+    val secret: String,
+    val configured: String,
+    val enabled: String,
+    val executable: String,
+    val missing: String,
+    val unknown: String,
+    val commandCompletedEmpty: String,
+    val commandFailedEmpty: String,
+    val notRunYet: String,
+    val updateCheckFailed: String,
+    val unableToReachGithub: String,
+    val alreadyUpToDate: String,
+    val installedMatchesLatest: String,
+) {
+    fun pageLabel(page: MagicPage): String =
+        when (page) {
+            MagicPage.Stats -> "MagicNet"
+            MagicPage.Rules -> if (this === zh) "规则" else "Rule"
+            MagicPage.Apps -> if (this === zh) "应用" else "App"
+            MagicPage.Tools -> if (this === zh) "工具" else "Tool"
+        }
+
+    fun languageName(language: AppLanguage): String =
+        when (language) {
+            AppLanguage.English -> "English"
+            AppLanguage.Chinese -> "中文"
+        }
+
+    fun backgroundName(style: BackgroundStyle): String =
+        when (style) {
+            BackgroundStyle.Monet -> if (this === zh) "莫奈取色" else "Monet"
+            BackgroundStyle.Ember -> if (this === zh) "火炬" else "Ember"
+            BackgroundStyle.Aurora -> if (this === zh) "极光" else "Aurora"
+            BackgroundStyle.Minimal -> if (this === zh) "极简" else "Minimal"
+        }
+
+    fun ruleBucket(bucket: RuleBucket): String =
+        when (bucket) {
+            RuleBucket.Proxy -> if (this === zh) "代理" else "Proxy"
+            RuleBucket.Direct -> if (this === zh) "直连" else "Direct"
+            RuleBucket.Block -> if (this === zh) "阻断" else "Block"
+        }
+
+    fun appTarget(target: AppTarget): String =
+        when (target) {
+            AppTarget.Proxy -> if (this === zh) "代理" else "Proxy"
+            AppTarget.Bypass -> if (this === zh) "绕过" else "Bypass"
+        }
+
+    fun appMode(mode: String): String =
+        when (mode.lowercase()) {
+            "blacklist" -> if (this === zh) "黑名单" else "Blacklist"
+            "whitelist" -> if (this === zh) "白名单" else "Whitelist"
+            else -> mode.ifBlank { unknown }
+        }
+
+    fun cliState(value: String): String =
+        when (value.lowercase()) {
+            "executable" -> executable
+            "missing" -> missing
+            else -> value.ifBlank { unknown }
+        }
+
+    fun healthCompact(ok: Int, warn: Int, err: Int): String =
+        if (this === zh) "$ok 正常 / $warn 警告 / $err 错误" else "$ok ok / $warn warn / $err err"
+
+    fun healthLong(ok: Int, warn: Int, err: Int): String =
+        if (this === zh) "$ok 项正常，$warn 个警告，$err 个错误。" else "$ok ok, $warn warnings, $err errors."
+
+    fun latestSample(upRate: String, downRate: String): String =
+        if (this === zh) "最新采样：上行 $upRate / 下行 $downRate" else "Latest sample: $upRate up / $downRate down"
+
+    fun addDomain(bucket: String): String = if (this === zh) "添加${bucket}域名" else "Add $bucket domain"
+
+    fun invalidDomain(domain: String): String = if (this === zh) "无效域名：$domain" else "Invalid domain: $domain"
+
+    fun routeSummary(total: Int): String = if (this === zh) "MagicNet 中有 $total 条真实域名规则。" else "$total real domain rules from MagicNet."
+
+    fun runtimeRuleSummary(total: Int): String = if (this === zh) "当前模块中有 $total 个运行时规则集。" else "$total runtime rule sets in the module."
+
+    fun domainsForBucket(bucket: String): String = if (this === zh) "$bucket 域名" else "$bucket domains"
+
+    fun noDomains(bucket: String): String = if (this === zh) "还没有${bucket}域名。" else "No $bucket domains yet."
+
+    fun addPackage(target: String): String = if (this === zh) "添加应用到${target}" else "Add package to $target"
+
+    fun invalidPackage(pkg: String): String = if (this === zh) "无效包名：$pkg" else "Invalid package: $pkg"
+
+    fun policySummary(mode: String, proxy: Int, bypass: Int): String =
+        if (this === zh) "模式 ${appMode(mode)}。$proxy 个代理，$bypass 个绕过。" else "Mode ${appMode(mode)}. $proxy proxy, $bypass bypass."
+
+    fun appsForTarget(target: String): String = if (this === zh) "$target 应用" else "$target apps"
+
+    fun noPackages(target: String): String = if (this === zh) "还没有${target}应用。" else "No $target packages yet."
+
+    fun inPolicy(target: String): String = if (this === zh) "已加入 $target 名单" else "In $target policy"
+
+    fun more(count: Int): String = if (this === zh) "还有 $count 项" else "+$count more"
+
+    fun magicnetReachable(version: String): String = if (this === zh) "MagicNet $version 已连接。" else "MagicNet $version is reachable."
+
+    fun version(versionName: String): String = if (this === zh) "版本 $versionName" else "Version $versionName"
+
+    fun updateAvailable(latest: String): String = if (this === zh) "发现更新：$latest" else "Update available: $latest"
+
+    fun installedVersion(current: String): String =
+        if (this === zh) "已安装 $current。打开发布页下载最新 APK。" else "Installed $current. Open releases to download the latest APK."
+
+    companion object {
+        val en =
+            UiText(
+                dashboard = "Dashboard",
+                dashboardSubtitle = "MagicBox controls the MagicNet module.",
+                networkSpeed = "Network speed",
+                waitingLiveSamples = "Waiting for live samples.",
+                mode = "Mode",
+                core = "Core",
+                notReported = "not reported",
+                health = "Health",
+                sync = "Sync",
+                checking = "Checking",
+                ready = "ready",
+                needsRoot = "needs root",
+                running = "running",
+                run = "Run",
+                moduleHealth = "Module health",
+                waitingCliHealth = "Waiting for cli health.",
+                check = "check",
+                ok = "ok",
+                fail = "fail",
+                warn = "warn",
+                idle = "idle",
+                done = "done",
+                busy = "busy",
+                control = "Control",
+                checkingService = "Checking service status.",
+                start = "Start",
+                restart = "Restart",
+                stop = "Stop",
+                auto = "Auto",
+                applyConfig = "Apply config",
+                closeConns = "Close conns",
+                rules = "Rules",
+                rulesSubtitle = "Edit domain rules through MagicNet CLI.",
+                add = "Add",
+                reload = "Reload",
+                apply = "Apply",
+                lastWriteCommand = "Last write command",
+                customRouteSuffixes = "Custom suffixes",
+                runtimeRuleSets = "Runtime rule sets",
+                domainPlaceholder = "example.com",
+                filterDomain = "filter domain",
+                domainSuffix = "domain suffix",
+                apps = "Apps",
+                appsSubtitle = "Per-app proxy and bypass rules.",
+                blacklist = "Blacklist",
+                whitelist = "Whitelist",
+                policy = "Policy",
+                loadingAppPolicy = "Loading app policy.",
+                installedPackages = "Installed packages",
+                searchPackage = "search package",
+                search = "Search",
+                lastAppCommand = "Last app command",
+                remove = "Remove",
+                recommendedBypass = "Recommended bypass",
+                noRecommendedBypass = "No recommended bypass packages are available.",
+                blacklistHint = "Blacklist mode: Bypass apps skip MagicNet; the rest can enter MagicNet.",
+                whitelistHint = "Whitelist mode: only Proxy apps enter MagicNet; the rest skip MagicNet.",
+                filterPolicy = "filter policy",
+                alreadyInPolicy = "already in policy",
+                installedPackage = "installed package",
+                packagePlaceholder = "com.example.app",
+                live = "Live",
+                up = "Up",
+                down = "Down",
+                tools = "Tools",
+                toolsSubtitle = "Diagnostics, subscriptions, updates, and issue drafts.",
+                language = "Language",
+                background = "Background",
+                backgroundHint = "Monet extracts system wallpaper colors. Presets keep a dark, low-noise control surface.",
+                subscription = "Subscription",
+                loadingSubscription = "Loading subscription state.",
+                updateSub = "Update sub",
+                updateAll = "Update all",
+                diagnostics = "Diagnostics",
+                diagnose = "Diagnose",
+                support = "Support",
+                ecapture = "eCapture",
+                mcpLogs = "MCP logs",
+                diffIssue = "Diff issue",
+                draft = "Draft",
+                toolOutput = "Tool output",
+                checkingUpdates = "Checking updates",
+                contactingGithub = "Contacting GitHub releases...",
+                checkGithubReleases = "Check GitHub releases.",
+                githubReleases = "GitHub releases",
+                openApkPage = "Open the published APK page.",
+                open = "Open",
+                attribution = "Attribution",
+                attributionText = "UI direction references YumeBox by YumeYucca. MagicBox keeps its own package, icon, releases, and issue channel.",
+                routingTable = "Routing table",
+                waitingRouteList = "Waiting for MagicNet route list.",
+                backendBridge = "Backend bridge",
+                checkingModule = "Checking MagicNet module.",
+                module = "module",
+                secret = "Secret",
+                configured = "configured",
+                enabled = "enabled",
+                executable = "executable",
+                missing = "missing",
+                unknown = "unknown",
+                commandCompletedEmpty = "Command completed with empty output.",
+                commandFailedEmpty = "Command failed with empty output.",
+                notRunYet = "Not run yet",
+                updateCheckFailed = "Update check failed",
+                unableToReachGithub = "Unable to reach GitHub releases.",
+                alreadyUpToDate = "Already up to date",
+                installedMatchesLatest = "Installed version matches latest release.",
+            )
+
+        val zh =
+            UiText(
+                dashboard = "仪表盘",
+                dashboardSubtitle = "MagicBox 控制 MagicNet 模块。",
+                networkSpeed = "网络速度",
+                waitingLiveSamples = "等待实时采样。",
+                mode = "模式",
+                core = "内核",
+                notReported = "未上报",
+                health = "健康",
+                sync = "同步",
+                checking = "检查中",
+                ready = "就绪",
+                needsRoot = "需要 root",
+                running = "运行中",
+                run = "运行",
+                moduleHealth = "模块健康",
+                waitingCliHealth = "等待 CLI 健康检查。",
+                check = "检查",
+                ok = "正常",
+                fail = "失败",
+                warn = "警告",
+                idle = "空闲",
+                done = "完成",
+                busy = "忙碌",
+                control = "控制",
+                checkingService = "正在检查服务状态。",
+                start = "启动",
+                restart = "重启",
+                stop = "停止",
+                auto = "自动",
+                applyConfig = "应用配置",
+                closeConns = "关闭连接",
+                rules = "规则",
+                rulesSubtitle = "通过 MagicNet CLI 编辑域名规则。",
+                add = "添加",
+                reload = "刷新",
+                apply = "应用",
+                lastWriteCommand = "最近写入命令",
+                customRouteSuffixes = "自定义后缀",
+                runtimeRuleSets = "运行时规则集",
+                domainPlaceholder = "example.com",
+                filterDomain = "筛选域名",
+                domainSuffix = "域名后缀",
+                apps = "应用",
+                appsSubtitle = "按应用设置代理和绕过规则。",
+                blacklist = "黑名单",
+                whitelist = "白名单",
+                policy = "策略",
+                loadingAppPolicy = "正在加载应用策略。",
+                installedPackages = "已安装应用",
+                searchPackage = "搜索包名",
+                search = "搜索",
+                lastAppCommand = "最近应用命令",
+                remove = "移除",
+                recommendedBypass = "推荐绕过",
+                noRecommendedBypass = "没有可加入的推荐绕过应用。",
+                blacklistHint = "黑名单模式：绕过应用不经过 MagicNet，其余应用可进入 MagicNet。",
+                whitelistHint = "白名单模式：只有代理应用进入 MagicNet，其余应用绕过。",
+                filterPolicy = "过滤名单",
+                alreadyInPolicy = "已在名单中",
+                installedPackage = "已安装应用",
+                packagePlaceholder = "com.example.app",
+                live = "实时",
+                up = "上行",
+                down = "下行",
+                tools = "工具",
+                toolsSubtitle = "诊断、订阅、更新和问题草稿。",
+                language = "语言",
+                background = "背景",
+                backgroundHint = "莫奈模式会读取系统壁纸颜色；预设背景保持暗色、克制、低干扰。",
+                subscription = "订阅",
+                loadingSubscription = "正在加载订阅状态。",
+                updateSub = "更新订阅",
+                updateAll = "全部更新",
+                diagnostics = "诊断",
+                diagnose = "诊断",
+                support = "支持包",
+                ecapture = "抓包",
+                mcpLogs = "MCP 日志",
+                diffIssue = "变更 Issue",
+                draft = "生成",
+                toolOutput = "工具输出",
+                checkingUpdates = "正在检查更新",
+                contactingGithub = "正在连接 GitHub 发布页...",
+                checkGithubReleases = "检查 GitHub 发布页。",
+                githubReleases = "GitHub Releases",
+                openApkPage = "打开已发布 APK 页面。",
+                open = "打开",
+                attribution = "致谢",
+                attributionText = "UI 方向参考 YumeYucca 的 YumeBox。MagicBox 保留自己的包名、图标、发布和 issue 渠道。",
+                routingTable = "路由表",
+                waitingRouteList = "等待 MagicNet 路由列表。",
+                backendBridge = "后端桥接",
+                checkingModule = "正在检查 MagicNet 模块。",
+                module = "模块",
+                secret = "密钥",
+                configured = "已配置",
+                enabled = "已启用",
+                executable = "可执行",
+                missing = "缺失",
+                unknown = "未知",
+                commandCompletedEmpty = "命令已完成，无输出。",
+                commandFailedEmpty = "命令失败，无输出。",
+                notRunYet = "尚未运行",
+                updateCheckFailed = "更新检查失败",
+                unableToReachGithub = "无法连接 GitHub 发布页。",
+                alreadyUpToDate = "已是最新版本",
+                installedMatchesLatest = "已安装版本与最新发布一致。",
+            )
+
+        fun forLanguage(language: AppLanguage): UiText =
+            when (language) {
+                AppLanguage.English -> en
+                AppLanguage.Chinese -> zh
+            }
+    }
+}
