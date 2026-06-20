@@ -4,6 +4,26 @@ plugins {
     kotlin("plugin.compose")
 }
 
+val releaseKeystoreFile = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
+val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val releaseSigningValues = listOf(
+    releaseKeystoreFile,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+)
+val hasAnyReleaseSigning = releaseSigningValues.any { !it.isNullOrBlank() }
+val hasReleaseSigning = releaseSigningValues.all { !it.isNullOrBlank() }
+
+if (hasAnyReleaseSigning && !hasReleaseSigning) {
+    error(
+        "Release signing requires ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD, " +
+            "ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.",
+    )
+}
+
 android {
     namespace = providers.gradleProperty("project.namespace.base").get()
     compileSdk = providers.gradleProperty("android.compileSdk").map(String::toInt).get()
@@ -28,6 +48,25 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     sourceSets {

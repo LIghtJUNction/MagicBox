@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-debug:
-    name: Build debug APK
+  build-apks:
+    name: Build APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -33,11 +33,11 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assemble --stacktrace
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: MagicBox-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: MagicBox-apks
+          path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error

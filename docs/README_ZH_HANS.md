@@ -50,5 +50,9 @@ MagicBox 以 GNU Affero General Public License v3.0 or later 发布。见
 
 使用 GitHub Actions 里的 `Release` 工作流。手动发布时选择 `patch`、`minor` 或
 `major`，也可以填写精确版本号。工作流会自动递增 `gradle.properties` 里的
-`project.version.name` 和 `project.version.code`，提交版本变更，构建 APK，并创建
-GitHub Release。
+`project.version.name` 和 `project.version.code`，提交版本变更，构建 debug 和
+release APK，并创建 GitHub Release。
+
+如果要发布已签名的 release APK，需要配置仓库 secrets：
+`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和
+`ANDROID_KEY_PASSWORD`。未配置时，CI 仍会上传 debug APK 和未签名的 release APK。

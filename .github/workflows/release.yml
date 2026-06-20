@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   release:
-    name: Bump, build, and publish APK
+    name: Bump, build, and publish APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -54,6 +54,21 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
+
+      - name: Decode release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_BASE64}" ]]; then
+            echo "ANDROID_KEYSTORE_BASE64 is not set; release APK will be unsigned."
+            exit 0
+          fi
+
+          keystore="${RUNNER_TEMP}/magicbox-release.jks"
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${keystore}"
+          echo "ANDROID_KEYSTORE_FILE=${keystore}" >> "${GITHUB_ENV}"
 
       - name: Resolve release version
         id: release
@@ -153,19 +168,37 @@ jobs:
           echo "target=${target}" >> "${GITHUB_OUTPUT}"
           echo "branch=${branch:-}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Build APKs
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assemble --stacktrace
 
       - name: Push version bump
         if: github.event_name == 'workflow_dispatch'
         run: git push origin "HEAD:${{ steps.release.outputs.branch }}"
 
-      - name: Prepare artifact
+      - name: Prepare artifacts
         shell: bash
         run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk \
-            "release/MagicBox-${{ steps.release.outputs.tag }}-${{ steps.release.outputs.version_code }}-debug.apk"
+          apks=(app/build/outputs/apk/**/*.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "No APKs were produced" >&2
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            name="$(basename "${apk}")"
+            variant="${name#app-}"
+            variant="${variant%.apk}"
+            cp "${apk}" "release/MagicBox-${{ steps.release.outputs.tag }}-${{ steps.release.outputs.version_code }}-${variant}.apk"
+          done
+          ls -lh release
 
       - name: Create or update GitHub release
         env:

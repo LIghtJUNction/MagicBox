@@ -55,4 +55,10 @@ later. See [LICENSE](../LICENSE).
 Use the GitHub Actions `Release` workflow. For manual releases, choose a
 `patch`, `minor`, or `major` bump, or enter an exact version. The workflow
 increments `project.version.name` and `project.version.code` in
-`gradle.properties`, commits the bump, builds the APK, and publishes a release.
+`gradle.properties`, commits the bump, builds the debug and release APKs, and
+publishes a release.
+
+To publish a signed release APK, configure these repository secrets:
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+and `ANDROID_KEY_PASSWORD`. Without them, CI still uploads the debug APK and the
+unsigned release APK.

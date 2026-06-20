@@ -19,8 +19,13 @@ See [docs/README.md](docs/README.md) and [NOTICE.md](NOTICE.md).
 
 Use **Actions → Release → Run workflow**. Pick `patch`, `minor`, or `major`.
 The workflow updates `gradle.properties`, commits the version bump, builds the
-APK, tags the commit, and publishes a GitHub Release.
+debug and release APKs, tags the commit, and publishes a GitHub Release.
 
 You can also provide an exact version such as `0.2.0`.
+
+Release signing is optional in CI. Add `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
+repository secrets to publish a signed release APK; otherwise the release
+variant is uploaded as `release-unsigned`.
 
 License: AGPL-3.0-or-later. See [LICENSE](LICENSE).
