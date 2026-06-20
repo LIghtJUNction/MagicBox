@@ -1,0 +1,57 @@
+<svg width="1440" height="420" viewBox="0 0 1440 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">MagicBox surface</title>
+  <desc id="desc">Four MagicBox surfaces: dashboard, rule, app, and tool.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101B2F"/>
+      <stop offset="1" stop-color="#180F1B"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#E08AA8"/>
+      <stop offset=".5" stop-color="#82C6A8"/>
+      <stop offset="1" stop-color="#2B7CFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="420" rx="36" fill="#05070D"/>
+  <rect x="30" y="30" width="1380" height="360" rx="30" fill="#0B101C"/>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <g transform="translate(64 72)">
+      <rect width="296" height="276" rx="30" fill="url(#panel)"/>
+      <text x="30" y="58" font-size="22" font-weight="800" fill="#F8F2F6">Dashboard</text>
+      <rect x="30" y="82" width="116" height="4" rx="2" fill="#E08AA8"/>
+      <text x="30" y="138" font-size="48" font-weight="900" fill="#FFFFFF">8.4</text>
+      <text x="122" y="138" font-size="20" font-weight="700" fill="#A99BA5">MB/s</text>
+      <polyline points="34,206 74,178 118,190 164,132 210,148 260,102" stroke="#82C6A8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(392 72)">
+      <rect width="296" height="276" rx="30" fill="url(#panel)"/>
+      <text x="30" y="58" font-size="22" font-weight="800" fill="#F8F2F6">Rule</text>
+      <rect x="30" y="82" width="116" height="4" rx="2" fill="#82C6A8"/>
+      <text x="30" y="136" font-size="44" font-weight="900" fill="#FFFFFF">34</text>
+      <text x="94" y="136" font-size="19" font-weight="700" fill="#A99BA5">runtime rule sets</text>
+      <rect x="30" y="168" width="222" height="34" rx="17" fill="#132542"/>
+      <rect x="30" y="214" width="174" height="34" rx="17" fill="#132542"/>
+    </g>
+    <g transform="translate(720 72)">
+      <rect width="296" height="276" rx="30" fill="url(#panel)"/>
+      <text x="30" y="58" font-size="22" font-weight="800" fill="#F8F2F6">App</text>
+      <rect x="30" y="82" width="116" height="4" rx="2" fill="#2B7CFF"/>
+      <circle cx="62" cy="134" r="24" fill="#FFFFFF"/>
+      <circle cx="62" cy="134" r="13" fill="#2B7CFF"/>
+      <rect x="98" y="116" width="140" height="16" rx="8" fill="#EDE7EB"/>
+      <rect x="98" y="144" width="174" height="12" rx="6" fill="#746C75"/>
+      <rect x="30" y="194" width="102" height="46" rx="23" fill="#12365F"/>
+      <rect x="152" y="194" width="102" height="46" rx="23" fill="#12365F"/>
+    </g>
+    <g transform="translate(1048 72)">
+      <rect width="296" height="276" rx="30" fill="url(#panel)"/>
+      <text x="30" y="58" font-size="22" font-weight="800" fill="#F8F2F6">Tool</text>
+      <rect x="30" y="82" width="116" height="4" rx="2" fill="url(#accent)"/>
+      <rect x="30" y="120" width="236" height="40" rx="20" fill="#132542"/>
+      <rect x="30" y="178" width="108" height="46" rx="23" fill="#5B314C"/>
+      <rect x="156" y="178" width="110" height="46" rx="23" fill="#12365F"/>
+      <text x="42" y="260" font-size="16" font-weight="700" fill="#A99BA5">diff issue · logs · release</text>
+    </g>
+  </g>
+</svg>

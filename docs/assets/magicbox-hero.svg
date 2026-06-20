@@ -1,0 +1,86 @@
+<svg width="1440" height="760" viewBox="0 0 1440 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">MagicBox hero</title>
+  <desc id="desc">A dark MagicBox product hero with phone-like panels and animated ASCII-inspired texture.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1440" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#04070D"/>
+      <stop offset=".42" stop-color="#0B1322"/>
+      <stop offset="1" stop-color="#170A16"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1110 90) rotate(128) scale(650 500)">
+      <stop stop-color="#2B7CFF" stop-opacity=".55"/>
+      <stop offset=".48" stop-color="#174878" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 620) rotate(-24) scale(640 420)">
+      <stop stop-color="#E08AA8" stop-opacity=".48"/>
+      <stop offset=".5" stop-color="#59334D" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="line" x1="272" y1="392" x2="776" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E08AA8"/>
+      <stop offset=".52" stop-color="#82C6A8"/>
+      <stop offset="1" stop-color="#2B7CFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="760" rx="42" fill="url(#bg)"/>
+  <rect width="1440" height="760" rx="42" fill="url(#glowA)"/>
+  <rect width="1440" height="760" rx="42" fill="url(#glowB)"/>
+
+  <g opacity=".16" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#7AA7FF">
+    <text x="72" y="94">0101 ./ MagicNet :: rule_set --live</text>
+    <text x="1070" y="176">{ proxy direct block }</text>
+    <text x="820" y="642">tun ebpf ascii monet root</text>
+    <text x="118" y="704">[]{}[]{} 0110 1001 0011</text>
+  </g>
+  <g opacity=".08" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22" fill="#E08AA8">
+    <text x="1012" y="438">::::: //// &lt;&gt;&lt;&gt; 001</text>
+    <text x="330" y="132">run stats diff issue</text>
+  </g>
+
+  <g transform="translate(84 108)">
+    <rect x="0" y="0" width="655" height="498" rx="34" fill="#05070D" fill-opacity=".34" stroke="#FFFFFF" stroke-opacity=".08"/>
+    <text x="58" y="130" font-family="Georgia, 'Times New Roman', serif" font-size="96" fill="#F7EEF2">MagicBox</text>
+    <rect x="62" y="160" width="436" height="4" rx="2" fill="url(#line)"/>
+    <text x="64" y="230" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="30" fill="#D7C9D1">Frontend for rooted MagicNet control.</text>
+    <text x="64" y="278" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="20" fill="#A99BA5">Stats · Rules · Apps · Tools</text>
+    <g transform="translate(62 330)">
+      <rect width="150" height="54" rx="27" fill="#173A67"/>
+      <text x="75" y="35" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="#F8F2F6">Dark only</text>
+      <rect x="166" width="150" height="54" rx="27" fill="#5B314C"/>
+      <text x="241" y="35" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="#F8F2F6">Monet tint</text>
+      <rect x="332" width="168" height="54" rx="27" fill="#173A67"/>
+      <text x="416" y="35" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="#F8F2F6">Real CLI</text>
+    </g>
+  </g>
+
+  <g transform="translate(810 74)">
+    <rect x="0" y="0" width="342" height="612" rx="54" fill="#060910" stroke="#FFFFFF" stroke-opacity=".12"/>
+    <rect x="22" y="28" width="298" height="556" rx="36" fill="#0B1322"/>
+    <text x="48" y="96" font-family="Georgia, 'Times New Roman', serif" font-size="48" fill="#F7EEF2">MagicNet</text>
+    <rect x="48" y="124" width="88" height="3" rx="2" fill="#E08AA8"/>
+    <rect x="48" y="168" width="246" height="106" rx="24" fill="#132542"/>
+    <text x="72" y="204" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" fill="#AFC6FF">NETWORK SPEED</text>
+    <text x="72" y="252" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="42" font-weight="800" fill="#FFFFFF">8.4 MB/s</text>
+    <rect x="48" y="300" width="112" height="92" rx="22" fill="#121A2F"/>
+    <text x="72" y="334" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#E08AA8">RULE SETS</text>
+    <text x="72" y="374" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="36" font-weight="800" fill="#FFFFFF">34</text>
+    <rect x="182" y="300" width="112" height="92" rx="22" fill="#121A2F"/>
+    <text x="206" y="334" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#82C6A8">APPS</text>
+    <text x="206" y="374" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="36" font-weight="800" fill="#FFFFFF">11</text>
+    <rect x="48" y="422" width="246" height="56" rx="28" fill="#12365F"/>
+    <text x="171" y="457" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF">Apply MagicNet</text>
+    <rect x="48" y="510" width="246" height="42" rx="21" fill="#080B12"/>
+    <circle cx="88" cy="531" r="8" fill="#E08AA8"/>
+    <circle cx="171" cy="531" r="8" fill="#82C6A8"/>
+    <circle cx="254" cy="531" r="8" fill="#2B7CFF"/>
+  </g>
+
+  <g transform="translate(1110 184)" opacity=".72" filter="url(#soft)">
+    <circle cx="0" cy="0" r="68" fill="#2B7CFF"/>
+  </g>
+</svg>

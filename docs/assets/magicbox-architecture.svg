@@ -1,0 +1,41 @@
+<svg width="1100" height="360" viewBox="0 0 1100 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">MagicBox architecture</title>
+  <desc id="desc">MagicBox is a frontend that invokes the MagicNet CLI inside the Magisk module.</desc>
+  <defs>
+    <linearGradient id="box" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#111D34"/>
+      <stop offset="1" stop-color="#201120"/>
+    </linearGradient>
+    <linearGradient id="wire" x1="170" y1="180" x2="930" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E08AA8"/>
+      <stop offset=".5" stop-color="#82C6A8"/>
+      <stop offset="1" stop-color="#2B7CFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1100" height="360" rx="32" fill="#060910"/>
+  <path d="M266 180H834" stroke="url(#wire)" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="266" cy="180" r="13" fill="#E08AA8"/>
+  <circle cx="550" cy="180" r="13" fill="#82C6A8"/>
+  <circle cx="834" cy="180" r="13" fill="#2B7CFF"/>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+    <g transform="translate(70 78)">
+      <rect width="250" height="204" rx="28" fill="url(#box)" stroke="#FFFFFF" stroke-opacity=".1"/>
+      <text x="34" y="62" font-size="30" font-weight="900" fill="#FFFFFF">MagicBox</text>
+      <text x="34" y="104" font-size="18" fill="#C8BBC3">Compose Android UI</text>
+      <text x="34" y="138" font-size="15" fill="#8E8490">stats · rules · apps · tools</text>
+    </g>
+    <g transform="translate(425 78)">
+      <rect width="250" height="204" rx="28" fill="url(#box)" stroke="#FFFFFF" stroke-opacity=".1"/>
+      <text x="34" y="62" font-size="30" font-weight="900" fill="#FFFFFF">Root CLI</text>
+      <text x="34" y="104" font-size="18" fill="#C8BBC3">/data/adb/modules</text>
+      <text x="34" y="138" font-size="15" fill="#8E8490">no fake backend state</text>
+    </g>
+    <g transform="translate(780 78)">
+      <rect width="250" height="204" rx="28" fill="url(#box)" stroke="#FFFFFF" stroke-opacity=".1"/>
+      <text x="34" y="62" font-size="30" font-weight="900" fill="#FFFFFF">MagicNet</text>
+      <text x="34" y="104" font-size="18" fill="#C8BBC3">Magisk module</text>
+      <text x="34" y="138" font-size="15" fill="#8E8490">sing-box · rules · policy</text>
+    </g>
+  </g>
+</svg>
