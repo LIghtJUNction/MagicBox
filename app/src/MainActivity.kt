@@ -127,11 +127,13 @@ private fun StatsPage() {
         scope.launch {
             val statsJob = async { runMagicNet("api stats") }
             val healthJob = async { runMagicNet("health") }
-            stats = statsJob.await()
+            stats = normalizeStatsResult(statsJob.await())
             health = healthJob.await()
-            parseStats(stats?.output.orEmpty())?.let {
-                samples.add(it)
-                while (samples.size > 18) samples.removeAt(0)
+            parseStatsSamples(stats?.output.orEmpty()).forEach { sample ->
+                samples.add(sample)
+                while (samples.size > 18) {
+                    samples.removeAt(0)
+                }
             }
             loading = false
         }
@@ -146,12 +148,16 @@ private fun StatsPage() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Label("Real-time stats")
-                    Value(
-                        samples.lastOrNull()?.let { "${formatRate(it.up)} up / ${formatRate(it.down)} down" }
-                            ?: if (stats?.success == false) "Root unavailable" else "No sample yet",
-                    )
+                    Value(if (stats?.success == false) "Root unavailable" else "Live throughput")
                 }
                 SmallButton(if (loading) "Running" else "Run", enabled = !loading, onClick = ::refresh)
+            }
+            samples.lastOrNull()?.let { latest ->
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RateBadge("UP", formatRate(latest.up), MagicPalette.green, Modifier.weight(1f))
+                    RateBadge("DOWN", formatRate(latest.down), MagicPalette.cyan, Modifier.weight(1f))
+                }
             }
             Spacer(Modifier.height(12.dp))
             StatsLineChart(samples = samples, modifier = Modifier.fillMaxWidth().height(132.dp))
@@ -177,7 +183,7 @@ private fun HealthPanel(result: CliResult?) {
         result?.output
             ?.lineSequence()
             ?.filter { it.isNotBlank() }
-            ?.take(if (result.success) 9 else 0)
+            ?.take(if (result.success) 4 else 0)
             ?.forEach { line ->
                 HealthLine(line)
                 Spacer(Modifier.height(6.dp))
@@ -314,7 +320,13 @@ private fun ModulePage() {
     }
 
     LaunchedEffect(Unit) {
-        module = runRootCommand("ls -la /data/adb/modules/MagicNet && ls -la $MAGICNET_CLI")
+        module =
+            runRootCommand(
+                "printf 'MagicNet module: '; " +
+                    "sed -n 's/^version=//p' /data/adb/modules/MagicNet/module.prop | head -n 1; " +
+                    "test -x $MAGICNET_CLI && echo 'CLI: executable' || echo 'CLI: missing'; " +
+                    "$MAGICNET_CLI mcp status 2>&1 | head -n 4",
+            )
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -373,21 +385,69 @@ private fun Header(title: String, summary: String) {
 @Composable
 private fun MagicMark() {
     Box(
-        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(8.dp)).background(MagicPalette.ink),
+        modifier =
+            Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MagicPalette.ink)
+                .border(1.dp, MagicPalette.line, RoundedCornerShape(14.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(28.dp)) {
-            val path =
+        Canvas(modifier = Modifier.fillMaxSize().padding(9.dp)) {
+            val shadow =
                 Path().apply {
-                    moveTo(size.width * 0.06f, size.height * 0.72f)
-                    lineTo(size.width * 0.28f, size.height * 0.38f)
-                    lineTo(size.width * 0.48f, size.height * 0.58f)
-                    lineTo(size.width * 0.72f, size.height * 0.22f)
-                    lineTo(size.width * 0.94f, size.height * 0.42f)
+                    moveTo(size.width * 0.1f, size.height * 0.72f)
+                    lineTo(size.width * 0.28f, size.height * 0.34f)
+                    lineTo(size.width * 0.5f, size.height * 0.58f)
+                    lineTo(size.width * 0.72f, size.height * 0.28f)
+                    lineTo(size.width * 0.9f, size.height * 0.52f)
                 }
-            drawPath(path, color = MagicPalette.cyan, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-            drawCircle(MagicPalette.orange, radius = 3.2.dp.toPx(), center = Offset(size.width * 0.72f, size.height * 0.22f))
+            drawPath(
+                shadow,
+                color = MagicPalette.cyan.copy(alpha = 0.2f),
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round),
+            )
+            val monogram =
+                Path().apply {
+                    moveTo(size.width * 0.1f, size.height * 0.72f)
+                    lineTo(size.width * 0.28f, size.height * 0.34f)
+                    lineTo(size.width * 0.5f, size.height * 0.58f)
+                    lineTo(size.width * 0.72f, size.height * 0.28f)
+                    lineTo(size.width * 0.9f, size.height * 0.52f)
+                }
+            drawPath(monogram, color = MagicPalette.cyan, style = Stroke(width = 4.4.dp.toPx(), cap = StrokeCap.Round))
+            drawCircle(MagicPalette.orange, radius = 4.dp.toPx(), center = Offset(size.width * 0.72f, size.height * 0.28f))
         }
+    }
+}
+
+@Composable
+private fun RateBadge(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MagicPalette.control)
+                .border(1.dp, MagicPalette.line, RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(accent))
+            Spacer(Modifier.width(7.dp))
+            Label(label)
+        }
+        Spacer(Modifier.height(6.dp))
+        BasicText(
+            text = value,
+            style = TextStyle(color = MagicPalette.text, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -450,7 +510,7 @@ private fun HealthLine(line: String) {
     Row(verticalAlignment = Alignment.Top) {
         Box(Modifier.padding(top = 6.dp).size(7.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(8.dp))
-        Body(line)
+        Body(line.take(150))
     }
 }
 
@@ -473,7 +533,7 @@ private fun CommandBlock(title: String, result: CliResult?) {
         val output = result?.output.orEmpty().trim()
         if (output.isNotBlank() && output != result?.summary) {
             Spacer(Modifier.height(8.dp))
-            Mono(output.take(1800))
+            Mono(output.take(900))
         }
     }
 }
@@ -756,6 +816,31 @@ private fun parseStats(output: String): LiveStats? {
     return if (up != null && down != null) LiveStats(up = up, down = down) else null
 }
 
+private fun parseStatsSamples(output: String): List<LiveStats> =
+    output
+        .lineSequence()
+        .filter { it.contains("\"up\"") && it.contains("\"down\"") }
+        .mapNotNull { parseStats(it) }
+        .toList()
+
+private fun normalizeStatsResult(result: CliResult): CliResult {
+    val jsonLines = result.output.lineSequence().filter { it.contains("\"up\"") && it.contains("\"down\"") }.toList()
+    if (jsonLines.isEmpty()) return result
+    val latest = parseStats(jsonLines.last()) ?: return result
+    return CliResult(
+        success = true,
+        command = result.command,
+        output =
+            buildString {
+                appendLine(jsonLines.takeLast(6).joinToString(separator = "\n"))
+                if (!result.success) {
+                    append("Latest sample kept; command exited after partial output.")
+                }
+            }.trim(),
+        summary = "Latest sample: ${formatRate(latest.up)} up / ${formatRate(latest.down)} down",
+    )
+}
+
 private fun formatRate(value: Float): String =
     when {
         value >= 1024 * 1024 -> "${"%.1f".format(value / 1024f / 1024f)} MB/s"
@@ -850,13 +935,13 @@ private data class CliResult(
     val success: Boolean,
     val command: String,
     val output: String,
-) {
     val summary: String =
         when {
             output.isBlank() && success -> "Command completed with empty output."
             output.isBlank() -> "Command failed with empty output."
             else -> output.lineSequence().firstOrNull().orEmpty()
-        }
+        },
+) {
 }
 
 private data class UpdateState(
