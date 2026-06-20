@@ -6,14 +6,23 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      tag_name:
-        description: "Release tag, for example v0.1.0"
+      bump:
+        description: "Version bump when version is empty"
         required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Optional exact version, for example 0.2.0 or v0.2.0"
+        required: false
         type: string
       prerelease:
         description: "Mark as prerelease"
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -21,12 +30,15 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish APK
+    name: Bump, build, and publish APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -43,45 +55,144 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Resolve release tag
+      - name: Resolve release version
         id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_BUMP: ${{ inputs.bump }}
+          INPUT_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
+          set -euo pipefail
+
+          read_prop() {
+            sed -n "s/^$1=//p" gradle.properties | head -n 1
+          }
+
+          validate_version() {
+            local value="$1"
+            if [[ ! "${value}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Version must look like 0.1.0" >&2
+              exit 1
+            fi
+          }
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
+            if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Tag must look like v0.1.0" >&2
+              exit 1
+            fi
+            version="${tag#v}"
+            version_code="$(read_prop project.version.code)"
+            target="${GITHUB_SHA}"
           else
-            tag="${{ inputs.tag_name }}"
-          fi
+            git fetch --tags --force
 
-          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Tag must look like v0.1.0" >&2
-            exit 1
+            requested="${INPUT_VERSION#v}"
+            if [[ -n "${requested}" ]]; then
+              version="${requested}"
+              validate_version "${version}"
+            else
+              latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1 || true)"
+              if [[ -n "${latest_tag}" ]]; then
+                base="${latest_tag#v}"
+              else
+                base="$(read_prop project.version.name)"
+              fi
+              validate_version "${base}"
+
+              IFS='.' read -r major minor patch_extra <<< "${base}"
+              patch="${patch_extra%%[-+]*}"
+              case "${INPUT_BUMP}" in
+                major)
+                  major=$((major + 1))
+                  minor=0
+                  patch=0
+                  ;;
+                minor)
+                  minor=$((minor + 1))
+                  patch=0
+                  ;;
+                patch)
+                  patch=$((patch + 1))
+                  ;;
+                *)
+                  echo "Unsupported bump: ${INPUT_BUMP}" >&2
+                  exit 1
+                  ;;
+              esac
+              version="${major}.${minor}.${patch}"
+            fi
+
+            tag="v${version}"
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+              echo "Tag already exists: ${tag}" >&2
+              exit 1
+            fi
+
+            current_code="$(read_prop project.version.code)"
+            version_code=$((current_code + 1))
+
+            sed -i \
+              -e "s/^project.version.name=.*/project.version.name=${version}/" \
+              -e "s/^project.version.code=.*/project.version.code=${version_code}/" \
+              gradle.properties
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add gradle.properties
+            git commit -m "Release ${tag}"
+            target="$(git rev-parse HEAD)"
+            branch="${GITHUB_REF_NAME}"
           fi
 
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "version_code=${version_code}" >> "${GITHUB_OUTPUT}"
+          echo "target=${target}" >> "${GITHUB_OUTPUT}"
+          echo "branch=${branch:-}" >> "${GITHUB_OUTPUT}"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Push version bump
+        if: github.event_name == 'workflow_dispatch'
+        run: git push origin "HEAD:${{ steps.release.outputs.branch }}"
 
       - name: Prepare artifact
         shell: bash
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk "release/MagicBox-${{ steps.release.outputs.tag }}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "release/MagicBox-${{ steps.release.outputs.tag }}-${{ steps.release.outputs.version_code }}-debug.apk"
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           args=()
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.prerelease }}" == "true" ]]; then
             args+=(--prerelease)
           fi
 
-          gh release create "${{ steps.release.outputs.tag }}" \
-            release/*.apk \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "MagicBox ${{ steps.release.outputs.tag }}" \
-            --notes "MagicBox Android frontend APK for the MagicNet Magisk module backend." \
-            "${args[@]}"
+          notes="MagicBox Android frontend APK for the MagicNet Magisk module backend.
+
+Version: ${{ steps.release.outputs.version }}
+Version code: ${{ steps.release.outputs.version_code }}"
+
+          if gh release view "${{ steps.release.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${{ steps.release.outputs.tag }}" release/*.apk \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${{ steps.release.outputs.tag }}" \
+              release/*.apk \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${{ steps.release.outputs.target }}" \
+              --title "MagicBox ${{ steps.release.outputs.tag }}" \
+              --notes "${notes}" \
+              "${args[@]}"
+          fi

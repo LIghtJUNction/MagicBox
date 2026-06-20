@@ -49,3 +49,10 @@ See [NOTICE](../NOTICE.md) for attribution details.
 
 MagicBox is distributed under the GNU Affero General Public License v3.0 or
 later. See [LICENSE](../LICENSE).
+
+## Release Workflow
+
+Use the GitHub Actions `Release` workflow. For manual releases, choose a
+`patch`, `minor`, or `major` bump, or enter an exact version. The workflow
+increments `project.version.name` and `project.version.code` in
+`gradle.properties`, commits the bump, builds the APK, and publishes a release.

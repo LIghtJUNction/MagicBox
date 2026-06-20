@@ -45,3 +45,10 @@ YumeBox issue 渠道。
 
 MagicBox 以 GNU Affero General Public License v3.0 or later 发布。见
 [LICENSE](../LICENSE)。
+
+## 发布工作流
+
+使用 GitHub Actions 里的 `Release` 工作流。手动发布时选择 `patch`、`minor` 或
+`major`，也可以填写精确版本号。工作流会自动递增 `gradle.properties` 里的
+`project.version.name` 和 `project.version.code`，提交版本变更，构建 APK，并创建
+GitHub Release。
