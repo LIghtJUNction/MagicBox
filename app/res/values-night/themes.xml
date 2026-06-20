@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.MagicBox" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:navigationBarColor">#141619</item>
-        <item name="android:statusBarColor">#141619</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">#090D10</item>
+        <item name="android:statusBarColor">#090D10</item>
+        <item name="android:windowBackground">#090D10</item>
     </style>
 </resources>

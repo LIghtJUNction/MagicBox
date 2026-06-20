@@ -24,6 +24,7 @@
 *.iml
 .navigation/
 captures/
+screenshots/
 
 # Native build
 .cxx/
