@@ -162,11 +162,13 @@ jobs:
             branch="${GITHUB_REF_NAME}"
           fi
 
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "version_code=${version_code}" >> "${GITHUB_OUTPUT}"
-          echo "target=${target}" >> "${GITHUB_OUTPUT}"
-          echo "branch=${branch:-}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "version_code=${version_code}"
+            echo "target=${target}"
+            echo "branch=${branch:-}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Build APKs
         env:
@@ -212,10 +214,13 @@ jobs:
             args+=(--prerelease)
           fi
 
-          notes="MagicBox Android frontend APK for the MagicNet Magisk module backend.
+          notes="$(cat <<NOTES
+          MagicBox Android frontend APK for the MagicNet Magisk module backend.
 
-Version: ${{ steps.release.outputs.version }}
-Version code: ${{ steps.release.outputs.version_code }}"
+          Version: ${{ steps.release.outputs.version }}
+          Version code: ${{ steps.release.outputs.version_code }}
+          NOTES
+          )"
 
           if gh release view "${{ steps.release.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release upload "${{ steps.release.outputs.tag }}" release/*.apk \
