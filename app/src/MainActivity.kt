@@ -1,5 +1,8 @@
 package com.github.lightjunction.magicbox
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +51,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -147,6 +157,18 @@ private fun IssuesPage() {
 
 @Composable
 private fun ModulePage() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var updateState by remember {
+        mutableStateOf(
+            UpdateState(
+                title = "Version ${BuildConfig.VERSION_NAME}",
+                summary = "Check GitHub releases for MagicBox updates.",
+                checking = false,
+            )
+        )
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.height(18.dp))
         PageTitle("Module")
@@ -163,6 +185,29 @@ private fun ModulePage() {
         }
         ToolPreviewCard(title = "Service", summary = "Targets: cli service status/start/stop/restart")
         ToolPreviewCard(title = "MCP", summary = "Targets: cli mcp status/enable/disable/secret")
+        ActionCard(
+            title = updateState.title,
+            summary = updateState.summary,
+            action = if (updateState.checking) "Checking" else "Check",
+            enabled = !updateState.checking,
+            onClick = {
+                updateState =
+                    UpdateState(
+                        title = "Checking updates",
+                        summary = "Contacting GitHub releases...",
+                        checking = true,
+                    )
+                scope.launch {
+                    updateState = checkForUpdates()
+                }
+            },
+        )
+        ActionCard(
+            title = "Release page",
+            summary = "Open GitHub releases to download published APKs.",
+            action = "Open",
+            onClick = { openUri(context, MAGICBOX_RELEASES_URL) },
+        )
         Card {
             BasicText(
                 text = "Attribution",
@@ -174,6 +219,71 @@ private fun ModulePage() {
                 style = TextStyle(color = MagicPalette.muted, fontSize = 14.sp, lineHeight = 20.sp),
             )
         }
+    }
+}
+
+private suspend fun checkForUpdates(): UpdateState =
+    withContext(Dispatchers.IO) {
+        val current = BuildConfig.VERSION_NAME.trim()
+        val latest =
+            runCatching { fetchLatestReleaseTag() }
+                .getOrElse { error ->
+                    return@withContext UpdateState(
+                        title = "Update check failed",
+                        summary = error.message ?: "Unable to reach GitHub releases.",
+                        checking = false,
+                    )
+                }
+        val latestVersion = latest.removePrefix("v").trim()
+        val hasUpdate = latestVersion != current
+        UpdateState(
+            title = if (hasUpdate) "Update available: $latest" else "Already up to date",
+            summary =
+                if (hasUpdate) {
+                    "Installed $current. Open releases to download the latest APK."
+                } else {
+                    "Installed version matches the latest GitHub release."
+                },
+            checking = false,
+        )
+    }
+
+private fun fetchLatestReleaseTag(): String {
+    val connection = URL(MAGICBOX_LATEST_RELEASE_API).openConnection() as HttpURLConnection
+    connection.requestMethod = "GET"
+    connection.connectTimeout = 6000
+    connection.readTimeout = 6000
+    connection.setRequestProperty("Accept", "application/vnd.github+json")
+    connection.setRequestProperty("User-Agent", "MagicBox/${BuildConfig.VERSION_NAME}")
+
+    return connection.use {
+        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+            throw IllegalStateException("No GitHub release has been published yet.")
+        }
+        if (responseCode !in 200..299) {
+            throw IllegalStateException("GitHub returned HTTP $responseCode.")
+        }
+        val body = inputStream.bufferedReader().use { reader -> reader.readText() }
+        Regex(""""tag_name"\s*:\s*"([^"]+)"""")
+            .find(body)
+            ?.groupValues
+            ?.get(1)
+            ?: throw IllegalStateException("Latest release tag was not found.")
+    }
+}
+
+private inline fun <T> HttpURLConnection.use(block: HttpURLConnection.() -> T): T =
+    try {
+        block()
+    } finally {
+        disconnect()
+    }
+
+private fun openUri(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }.recoverCatching { error ->
+        if (error is ActivityNotFoundException) Unit else throw error
     }
 }
 
@@ -317,6 +427,35 @@ private fun ToolPreviewCard(title: String, summary: String) {
 }
 
 @Composable
+private fun ActionCard(
+    title: String,
+    summary: String,
+    action: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                BasicText(
+                    text = title,
+                    style = TextStyle(color = MagicPalette.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+                )
+                Spacer(Modifier.height(4.dp))
+                BasicText(text = summary, style = TextStyle(color = MagicPalette.muted, fontSize = 13.sp))
+            }
+            Spacer(Modifier.width(12.dp))
+            StatusPill(action)
+        }
+    }
+}
+
+@Composable
 private fun SectionTitle(text: String) {
     BasicText(
         text = text,
@@ -409,3 +548,13 @@ private object MagicPalette {
     val green = Color(0xFF2EA872)
     val gold = Color(0xFFE2B451)
 }
+
+private data class UpdateState(
+    val title: String,
+    val summary: String,
+    val checking: Boolean,
+)
+
+private const val MAGICBOX_RELEASES_URL = "https://github.com/LIghtJUNction/MagicBox/releases"
+private const val MAGICBOX_LATEST_RELEASE_API =
+    "https://api.github.com/repos/LIghtJUNction/MagicBox/releases/latest"
