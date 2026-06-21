@@ -253,9 +253,7 @@ fun ControlPanel(
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SmallButton(t.auto, enabled = !loading, modifier = Modifier.weight(1f)) { onAction("transparent set auto") }
             SmallButton("TUN", enabled = !loading, modifier = Modifier.weight(1f)) { onAction("transparent set tun") }
-            SmallButton("eBPF", enabled = !loading, modifier = Modifier.weight(1f)) { onAction("transparent set ebpf") }
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

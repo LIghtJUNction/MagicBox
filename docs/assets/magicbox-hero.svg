@@ -34,7 +34,7 @@
   <g opacity=".16" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#7AA7FF">
     <text x="72" y="94">0101 ./ MagicNet :: rule_set --live</text>
     <text x="1070" y="176">{ proxy direct block }</text>
-    <text x="820" y="642">tun ebpf ascii monet root</text>
+    <text x="820" y="642">tun ascii monet root</text>
     <text x="118" y="704">[]{}[]{} 0110 1001 0011</text>
   </g>
   <g opacity=".08" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22" fill="#E08AA8">
