@@ -6,10 +6,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.ImageView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +34,7 @@ import kotlinx.coroutines.withContext
 data class InstalledApp(
     val label: String,
     val packageName: String,
+    val launchable: Boolean,
 )
 
 suspend fun loadInstalledApps(
@@ -46,9 +49,11 @@ suspend fun loadInstalledApps(
             .filter { app -> app.packageName != context.packageName }
             .filter { app -> pm.getLaunchIntentForPackage(app.packageName) != null || app.isUserApp() }
             .map { app ->
+                val launchable = pm.getLaunchIntentForPackage(app.packageName) != null
                 InstalledApp(
                     label = app.loadLabel(pm)?.toString()?.ifBlank { app.packageName } ?: app.packageName,
                     packageName = app.packageName,
+                    launchable = launchable,
                 )
             }
             .filter { app ->
@@ -58,8 +63,16 @@ suspend fun loadInstalledApps(
             }
             .distinctBy { it.packageName }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
-            .take(180)
             .toList()
+    }
+
+suspend fun loadInstalledPackageNames(context: Context): Set<String> =
+    withContext(Dispatchers.Default) {
+        context.packageManager
+            .installedApplications()
+            .asSequence()
+            .map { it.packageName }
+            .toSet()
     }
 
 suspend fun loadInstalledAppsFromPackages(
@@ -90,7 +103,6 @@ fun packageOutputToInstalledApps(
         }
         .distinctBy { it.packageName }
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
-        .take(180)
         .toList()
 }
 
@@ -103,7 +115,11 @@ private fun installedAppForPackage(
             .getOrNull()
             ?.ifBlank { packageName }
             ?: packageName
-    return InstalledApp(label = label, packageName = packageName)
+    return InstalledApp(
+        label = label,
+        packageName = packageName,
+        launchable = pm.getLaunchIntentForPackage(packageName) != null,
+    )
 }
 
 private fun PackageManager.installedApplications(): List<ApplicationInfo> =
@@ -131,9 +147,13 @@ fun InstalledAppRow(
     detail: String,
     primaryAction: String,
     secondaryAction: String,
+    tertiaryAction: String,
+    quaternaryAction: String,
     enabled: Boolean,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit,
+    onTertiary: () -> Unit,
+    onQuaternary: () -> Unit,
 ) {
     val colors = LocalMagicTheme.current
     Row(
@@ -166,11 +186,21 @@ fun InstalledAppRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(Modifier.height(7.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallButton(primaryAction, enabled = enabled, modifier = Modifier.weight(1f), onClick = onPrimary)
+                SmallButton(secondaryAction, enabled = enabled, modifier = Modifier.weight(1f), onClick = onSecondary)
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallButton(tertiaryAction, enabled = true, modifier = Modifier.weight(1f), onClick = onTertiary)
+                if (app.launchable) {
+                    SmallButton(quaternaryAction, enabled = true, modifier = Modifier.weight(1f), onClick = onQuaternary)
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        SmallButton(primaryAction, enabled = enabled, onClick = onPrimary)
-        Spacer(Modifier.width(6.dp))
-        SmallButton(secondaryAction, enabled = enabled, onClick = onSecondary)
     }
 }
 

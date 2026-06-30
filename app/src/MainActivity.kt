@@ -111,16 +111,6 @@ fun MagicBoxApp() {
     val themeColors = remember(backgroundPalette) { MagicThemeColors.from(backgroundPalette) }
     var backgroundTrafficRate by remember { mutableStateOf(0f) }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            val result = normalizeStatsResult(runMagicNet("api stats"))
-            parseStatsSamples(result.output).lastOrNull()?.let { sample ->
-                backgroundTrafficRate = sample.total
-            }
-            delay(2500)
-        }
-    }
-
     CompositionLocalProvider(LocalUiText provides text, LocalMagicTheme provides themeColors) {
         Box(modifier = Modifier.fillMaxSize()) {
             MagicBackground(backgroundStyle, backgroundPalette, backgroundTrafficRate)

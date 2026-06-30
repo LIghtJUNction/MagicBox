@@ -106,7 +106,11 @@ fun RouteSummaryCard(result: CliResult?, selectedBucket: RuleBucket) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CountBadge(t.ruleBucket(RuleBucket.Proxy).uppercase(), summary.proxy.size, MagicPalette.rose, Modifier.weight(1f))
                 CountBadge(t.ruleBucket(RuleBucket.Direct).uppercase(), summary.direct.size, MagicPalette.green, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CountBadge(t.ruleBucket(RuleBucket.Block).uppercase(), summary.block.size, MagicPalette.red, Modifier.weight(1f))
+                CountBadge(t.ruleBucket(RuleBucket.Warp).uppercase(), summary.warp.size, MagicPalette.orange, Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
             Label(t.domainsForBucket(t.ruleBucket(selectedBucket).uppercase()))
