@@ -224,6 +224,30 @@ fun TextInput(
 }
 
 @Composable
+fun MultiLineTextInput(
+    value: String,
+    placeholder: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalMagicTheme.current
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = TextStyle(color = MagicPalette.text, fontSize = 14.sp, lineHeight = 18.sp),
+        modifier = modifier.height(92.dp).clip(RoundedCornerShape(18.dp)).background(colors.control).padding(horizontal = 14.dp, vertical = 11.dp),
+        decorationBox = { inner ->
+            Box {
+                if (value.isBlank()) {
+                    BasicText(placeholder, style = TextStyle(color = MagicPalette.muted, fontSize = 14.sp, lineHeight = 18.sp))
+                }
+                inner()
+            }
+        },
+    )
+}
+
+@Composable
 fun Value(text: String) {
     BasicText(
         text = text,

@@ -39,6 +39,7 @@ enum class RuleBucket(val label: String, val cli: String) {
     Proxy("Proxy", "proxy"),
     Direct("Direct", "direct"),
     Block("Block", "block"),
+    Warp("WARP", "warp"),
 }
 
 enum class AppTarget(val label: String, val cli: String) {
@@ -49,6 +50,7 @@ enum class AppTarget(val label: String, val cli: String) {
 data class LiveStats(
     val up: Float,
     val down: Float,
+    val timestampMillis: Long = System.currentTimeMillis(),
 ) {
     val total: Float = up + down
 }
@@ -70,14 +72,16 @@ data class RouteSummary(
     val proxy: List<String>,
     val direct: List<String>,
     val block: List<String>,
+    val warp: List<String>,
 ) {
-    val total: Int = proxy.size + direct.size + block.size
+    val total: Int = proxy.size + direct.size + block.size + warp.size
 
     fun forBucket(bucket: RuleBucket): List<String> =
         when (bucket) {
             RuleBucket.Proxy -> proxy
             RuleBucket.Direct -> direct
             RuleBucket.Block -> block
+            RuleBucket.Warp -> warp
         }
 }
 
@@ -107,6 +111,19 @@ data class ModuleBridge(
     val port: String,
     val secretSet: String,
 )
+
+data class SubscriptionSource(
+    val target: String,
+    val index: Int,
+    val configured: Boolean,
+)
+
+data class SubscriptionSummary(
+    val sources: List<SubscriptionSource>,
+    val primaryConfigured: Boolean,
+) {
+    val configuredCount: Int = sources.count { it.configured }
+}
 
 data class BackgroundPalette(
     val base: Color,

@@ -109,55 +109,6 @@ data class UiText(
     val alreadyUpToDate: String,
     val installedMatchesLatest: String,
 ) {
-    fun pageLabel(page: MagicPage): String =
-        when (page) {
-            MagicPage.Stats -> "MagicNet"
-            MagicPage.Rules -> if (this === zh) "规则" else "Rule"
-            MagicPage.Apps -> if (this === zh) "应用" else "App"
-            MagicPage.Tools -> if (this === zh) "工具" else "Tool"
-        }
-
-    fun languageName(language: AppLanguage): String =
-        when (language) {
-            AppLanguage.English -> "English"
-            AppLanguage.Chinese -> "中文"
-        }
-
-    fun backgroundName(style: BackgroundStyle): String =
-        when (style) {
-            BackgroundStyle.Monet -> if (this === zh) "莫奈取色" else "Monet"
-            BackgroundStyle.Ember -> if (this === zh) "火炬" else "Ember"
-            BackgroundStyle.Aurora -> if (this === zh) "极光" else "Aurora"
-            BackgroundStyle.Minimal -> if (this === zh) "极简" else "Minimal"
-        }
-
-    fun ruleBucket(bucket: RuleBucket): String =
-        when (bucket) {
-            RuleBucket.Proxy -> if (this === zh) "代理" else "Proxy"
-            RuleBucket.Direct -> if (this === zh) "直连" else "Direct"
-            RuleBucket.Block -> if (this === zh) "阻断" else "Block"
-        }
-
-    fun appTarget(target: AppTarget): String =
-        when (target) {
-            AppTarget.Proxy -> if (this === zh) "代理" else "Proxy"
-            AppTarget.Bypass -> if (this === zh) "绕过" else "Bypass"
-        }
-
-    fun appMode(mode: String): String =
-        when (mode.lowercase()) {
-            "blacklist" -> if (this === zh) "黑名单" else "Blacklist"
-            "whitelist" -> if (this === zh) "白名单" else "Whitelist"
-            else -> mode.ifBlank { unknown }
-        }
-
-    fun cliState(value: String): String =
-        when (value.lowercase()) {
-            "executable" -> executable
-            "missing" -> missing
-            else -> value.ifBlank { unknown }
-        }
-
     fun healthCompact(ok: Int, warn: Int, err: Int): String =
         if (this === zh) "$ok 正常 / $warn 警告 / $err 错误" else "$ok ok / $warn warn / $err err"
 
