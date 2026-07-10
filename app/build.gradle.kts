@@ -75,6 +75,9 @@ android {
             kotlin.srcDir("src")
             res.srcDir("res")
         }
+        getByName("test") {
+            kotlin.srcDir("test")
+        }
     }
 }
 
@@ -95,5 +98,6 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

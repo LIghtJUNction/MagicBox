@@ -1,17 +1,5 @@
 package com.github.lightjunction.magicbox
 
-import android.app.WallpaperManager
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,58 +12,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun CommandBlock(title: String, result: CliResult?, showOutput: Boolean = false) {
@@ -118,12 +71,24 @@ fun ActionCard(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
-        padding = PaddingValues(12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .clickable(enabled = enabled, onClick = onClick),
+        padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                BasicText(text = title, style = TextStyle(color = MagicPalette.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold))
+                BasicText(
+                    text = title,
+                    style =
+                        TextStyle(
+                            color = MagicPalette.text,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                )
                 Body(summary)
             }
             Spacer(Modifier.width(8.dp))
@@ -140,28 +105,62 @@ fun <T> SegmentedControl(
     onSelect: (T) -> Unit,
 ) {
     val colors = LocalMagicTheme.current
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(999.dp)).background(colors.control).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        options.forEach { option ->
-            val active = option == selected
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(38.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (active) colors.controlSelected else Color.Transparent)
-                        .clickable { onSelect(option) },
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicText(
-                    text = label(option),
-                    style = TextStyle(color = if (active) MagicPalette.text else MagicPalette.muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+    val pill = RoundedCornerShape(999.dp)
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(pill)
+                .background(
+                    Brush.linearGradient(
+                        listOf(colors.line.copy(alpha = 0.72f), colors.controlSelected.copy(alpha = 0.48f)),
+                    ),
                 )
+                .padding(2.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(pill)
+                    .background(colors.navSurface)
+                    .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            options.forEach { option ->
+                val active = option == selected
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(pill)
+                            .then(
+                                if (active) {
+                                    Modifier.background(
+                                        Brush.linearGradient(
+                                            listOf(colors.controlSelected, colors.buttonSurface),
+                                        ),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable { onSelect(option) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(
+                        text = label(option),
+                        style =
+                            TextStyle(
+                                color = if (active) MagicPalette.text else MagicPalette.muted,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -175,21 +174,31 @@ fun SmallButton(
     onClick: () -> Unit,
 ) {
     val colors = LocalMagicTheme.current
+    val fill =
+        if (enabled) {
+            Brush.linearGradient(
+                listOf(colors.buttonSurface, colors.controlSelected),
+            )
+        } else {
+            Brush.linearGradient(
+                listOf(colors.control, colors.control.copy(alpha = 0.82f)),
+            )
+        }
     Box(
         modifier =
             modifier
-                .height(38.dp)
+                .heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(999.dp))
-                .background(if (enabled) colors.buttonSurface else colors.control)
+                .background(fill)
                 .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
             text = text,
             style =
                 TextStyle(
-                    color = if (enabled) MagicPalette.text else MagicPalette.muted,
+                    color = if (enabled) MagicPalette.buttonText else MagicPalette.muted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
@@ -213,10 +222,81 @@ fun TextInput(
         onValueChange = onValueChange,
         singleLine = true,
         textStyle = TextStyle(color = MagicPalette.text, fontSize = 15.sp),
-        modifier = modifier.height(42.dp).clip(RoundedCornerShape(18.dp)).background(colors.control).padding(horizontal = 14.dp, vertical = 11.dp),
+        modifier =
+            modifier
+                .height(52.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(colors.line.copy(alpha = 0.74f), colors.controlSelected.copy(alpha = 0.4f)),
+                    ),
+                )
+                .padding(2.dp),
         decorationBox = { inner ->
-            Box {
-                if (value.isBlank()) BasicText(placeholder, style = TextStyle(color = MagicPalette.muted, fontSize = 15.sp))
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(colors.control)
+                        .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (value.isBlank()) {
+                    BasicText(
+                        placeholder,
+                        style = TextStyle(color = MagicPalette.muted, fontSize = 15.sp),
+                    )
+                }
+                inner()
+            }
+        },
+    )
+}
+
+@Composable
+fun MultiLineTextInput(
+    value: String,
+    placeholder: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalMagicTheme.current
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = TextStyle(color = MagicPalette.text, fontSize = 14.sp, lineHeight = 19.sp),
+        modifier =
+            modifier
+                .height(112.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(colors.line.copy(alpha = 0.74f), colors.controlSelected.copy(alpha = 0.4f)),
+                    ),
+                )
+                .padding(2.dp),
+        decorationBox = { inner ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.control)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                contentAlignment = Alignment.TopStart,
+            ) {
+                if (value.isBlank()) {
+                    BasicText(
+                        placeholder,
+                        style =
+                            TextStyle(
+                                color = MagicPalette.muted,
+                                fontSize = 14.sp,
+                                lineHeight = 19.sp,
+                            ),
+                    )
+                }
                 inner()
             }
         },
@@ -237,7 +317,12 @@ fun Value(text: String) {
 fun Label(text: String) {
     BasicText(
         text = text,
-        style = TextStyle(color = MagicPalette.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+        style =
+            TextStyle(
+                color = MagicPalette.muted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+            ),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
@@ -245,7 +330,10 @@ fun Label(text: String) {
 
 @Composable
 fun Body(text: String) {
-    BasicText(text = text, style = TextStyle(color = MagicPalette.muted, fontSize = 13.sp, lineHeight = 18.sp))
+    BasicText(
+        text = text,
+        style = TextStyle(color = MagicPalette.muted, fontSize = 13.sp, lineHeight = 18.sp),
+    )
 }
 
 @Composable
@@ -259,15 +347,45 @@ fun Mono(text: String) {
 @Composable
 fun StatusPill(text: String, enabled: Boolean = true, onClick: (() -> Unit)? = null) {
     val colors = LocalMagicTheme.current
-    val clickableModifier = if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier
+    val pill = RoundedCornerShape(999.dp)
+    val fill =
+        if (enabled) {
+            Brush.linearGradient(
+                listOf(colors.controlSelected, colors.buttonSurface.copy(alpha = 0.84f)),
+            )
+        } else {
+            Brush.linearGradient(
+                listOf(colors.control, colors.control.copy(alpha = 0.78f)),
+            )
+        }
+    val interaction =
+        if (onClick != null) {
+            Modifier
+                .heightIn(min = 48.dp)
+                .clickable(enabled = enabled, onClick = onClick)
+        } else {
+            Modifier.heightIn(min = 30.dp)
+        }
     Box(
         modifier =
-            clickableModifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(if (enabled) colors.controlSelected else colors.control)
-                .padding(horizontal = 11.dp, vertical = 6.dp),
+            Modifier
+                .clip(pill)
+                .background(fill)
+                .then(interaction)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        BasicText(text = text, style = TextStyle(color = if (enabled) MagicPalette.text else MagicPalette.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold))
+        BasicText(
+            text = text,
+            style =
+                TextStyle(
+                    color = if (enabled) MagicPalette.text else MagicPalette.muted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -282,11 +400,32 @@ fun Card(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(colors.surface)
-                .padding(padding),
-        content = content,
-    )
+                .clip(RoundedCornerShape(28.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            colors.line.copy(alpha = 0.76f),
+                            colors.controlSelected.copy(alpha = 0.42f),
+                            colors.navSurface.copy(alpha = 0.9f),
+                        ),
+                    ),
+                )
+                .padding(2.dp),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(colors.surface, MagicPalette.ink.copy(alpha = 0.82f)),
+                        ),
+                    )
+                    .padding(padding),
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -297,33 +436,62 @@ fun BottomNavigation(
 ) {
     val t = LocalUiText.current
     val colors = LocalMagicTheme.current
-    Row(
+    val pill = RoundedCornerShape(999.dp)
+    Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(999.dp))
-                .background(colors.navSurface)
-                .padding(5.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        MagicPage.entries.forEach { page ->
-            val selected = page == selectedPage
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (selected) colors.controlSelected else Color.Transparent)
-                        .clickable { onSelect(page) },
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicText(
-                    text = t.pageLabel(page),
-                    style = TextStyle(color = if (selected) MagicPalette.text else MagicPalette.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                .clip(pill)
+                .background(
+                    Brush.linearGradient(
+                        listOf(colors.line.copy(alpha = 0.86f), colors.controlSelected.copy(alpha = 0.5f)),
+                    ),
                 )
+                .padding(2.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(pill)
+                    .background(colors.navSurface)
+                    .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            MagicPage.entries.forEach { page ->
+                val selected = page == selectedPage
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(pill)
+                            .then(
+                                if (selected) {
+                                    Modifier.background(
+                                        Brush.linearGradient(
+                                            listOf(colors.controlSelected, colors.buttonSurface),
+                                        ),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable { onSelect(page) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(
+                        text = t.pageLabel(page),
+                        style =
+                            TextStyle(
+                                color = if (selected) MagicPalette.text else MagicPalette.muted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

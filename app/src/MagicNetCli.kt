@@ -79,17 +79,21 @@ import kotlinx.coroutines.withContext
 
 suspend fun runMagicNet(args: String): CliResult = runRootCommand("$MAGICNET_CLI $args")
 
-suspend fun runRootCommand(command: String): CliResult =
+suspend fun runMagicNetLong(args: String): CliResult = runRootCommand("$MAGICNET_CLI $args", timeoutSeconds = 45)
+
+fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
+
+suspend fun runRootCommand(command: String, timeoutSeconds: Long = 6): CliResult =
     withContext(Dispatchers.IO) {
         var lastResult: CliResult? = null
         for (su in SU_CANDIDATES) {
-            val withNamespace = executeSu(listOf(su, "-M", "-c", command), command)
+            val withNamespace = executeSu(listOf(su, "-M", "-c", command), command, timeoutSeconds)
             val result =
                 when {
                     withNamespace.success -> withNamespace
                     withNamespace.output.contains("invalid", ignoreCase = true) ||
                         withNamespace.output.contains("unknown option", ignoreCase = true) -> {
-                        executeSu(listOf(su, "-c", command), command)
+                        executeSu(listOf(su, "-c", command), command, timeoutSeconds)
                     }
                     else -> withNamespace
                 }
@@ -110,7 +114,7 @@ suspend fun runRootCommand(command: String): CliResult =
 fun rootUnavailableMessage(): String =
     "Root is not granted to MagicBox. Grant com.github.lightjunction.magicbox in KernelSU/Magisk, then tap Run."
 
-fun executeSu(args: List<String>, command: String): CliResult {
+fun executeSu(args: List<String>, command: String, timeoutSeconds: Long = 6): CliResult {
     val process =
         runCatching {
             ProcessBuilder(args)
@@ -128,7 +132,7 @@ fun executeSu(args: List<String>, command: String): CliResult {
             }
         }.apply { start() }
 
-    val finished = process.waitFor(6, TimeUnit.SECONDS)
+    val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
     if (!finished) {
         process.destroyForcibly()
         readerThread.join(500)
@@ -145,12 +149,16 @@ fun parseStats(output: String): LiveStats? {
     return if (up != null && down != null) LiveStats(up = up, down = down) else null
 }
 
-fun parseStatsSamples(output: String): List<LiveStats> =
-    output
+fun parseStatsSamples(output: String): List<LiveStats> {
+    val parsedAt = System.currentTimeMillis()
+    return output
         .lineSequence()
         .filter { it.contains("\"up\"") && it.contains("\"down\"") }
-        .mapNotNull { parseStats(it) }
+        .mapIndexedNotNull { index, line ->
+            parseStats(line)?.copy(timestampMillis = parsedAt + index)
+        }
         .toList()
+}
 
 fun normalizeStatsResult(result: CliResult): CliResult {
     val jsonLines = result.output.lineSequence().filter { it.contains("\"up\"") && it.contains("\"down\"") }.toList()
@@ -171,11 +179,7 @@ fun normalizeStatsResult(result: CliResult): CliResult {
 }
 
 fun parseRouteSummary(output: String): RouteSummary {
-    val buckets = linkedMapOf(
-        RuleBucket.Proxy to mutableListOf<String>(),
-        RuleBucket.Direct to mutableListOf<String>(),
-        RuleBucket.Block to mutableListOf<String>(),
-    )
+    val buckets = RuleBucket.entries.associateWith { mutableListOf<String>() }
     var current: RuleBucket? = null
 
     output.lineSequence().forEach { raw ->
@@ -198,6 +202,7 @@ fun parseRouteSummary(output: String): RouteSummary {
         proxy = buckets.getValue(RuleBucket.Proxy),
         direct = buckets.getValue(RuleBucket.Direct),
         block = buckets.getValue(RuleBucket.Block),
+        warp = buckets.getValue(RuleBucket.Warp),
     )
 }
 
@@ -212,6 +217,14 @@ suspend fun loadRuntimeRuleSets(): CliResult =
           printf '%s\n' "${'$'}{name%.srs}"
         done | sort -u
         """.trimIndent(),
+    )
+
+suspend fun loadModuleBridgeStatus(): CliResult =
+    runRootCommand(
+        "printf 'MagicNet module: '; " +
+            "sed -n 's/^version=//p' /data/adb/modules/MagicNet/module.prop | head -n 1; " +
+            "test -x $MAGICNET_CLI && echo 'CLI: executable' || echo 'CLI: missing'; " +
+            "$MAGICNET_CLI mcp status 2>&1 | head -n 4",
     )
 
 fun parseRuntimeRuleSummary(output: String): RuntimeRuleSummary =
@@ -292,17 +305,6 @@ fun parseAppSummary(output: String): AppSummary {
 
     return AppSummary(mode, proxy, bypass)
 }
-
-fun buildIssueDraft(health: CliResult?, routes: CliResult?): String =
-    """
-    ## MagicBox Diff Issue
-
-    ### Health
-    ${health?.output?.take(1200).orEmpty()}
-
-    ### Routes
-    ${routes?.output?.take(1200).orEmpty()}
-    """.trimIndent()
 
 suspend fun checkForUpdates(t: UiText): UpdateState =
     withContext(Dispatchers.IO) {
