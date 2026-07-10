@@ -1,6 +1,7 @@
 package com.github.lightjunction.magicbox
 
 import org.json.JSONObject
+import java.util.Locale
 
 data class ConnectionSnapshot(
     val count: Int,
@@ -146,5 +147,9 @@ fun formatBytes(value: Long): String {
         amount /= 1024.0
         unit += 1
     }
-    return if (unit == 0) "${amount.toLong()} ${units[unit]}" else String.format("%.1f %s", amount, units[unit])
+    return if (unit == 0) {
+        "${amount.toLong()} ${units[unit]}"
+    } else {
+        String.format(Locale.ROOT, "%.1f %s", amount, units[unit])
+    }
 }

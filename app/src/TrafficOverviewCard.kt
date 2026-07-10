@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import kotlin.math.sqrt
 
 data class TrafficOverview(
@@ -77,7 +78,7 @@ fun TrafficOverviewCard(samples: List<LiveStats>) {
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TrafficMetricColumn(t.trafficProfile(), t.trafficProfileState(profile.state), Modifier.weight(1f))
-            TrafficMetricColumn(t.burstRatio(), String.format("%.1fx", profile.burstRatio), Modifier.weight(1f))
+            TrafficMetricColumn(t.burstRatio(), String.format(Locale.ROOT, "%.1fx", profile.burstRatio), Modifier.weight(1f))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -168,7 +169,8 @@ private fun List<LiveStats>.trafficTrend(): TrafficTrendDirection {
     }
 }
 
-fun formatPercent(value: Float): String = String.format("%.0f%%", (value * 100f).coerceAtLeast(0f))
+fun formatPercent(value: Float): String =
+    String.format(Locale.ROOT, "%.0f%%", (value * 100f).coerceAtLeast(0f))
 
 fun formatTrafficWindow(millis: Long): String {
     if (millis <= 0L) return "0s"

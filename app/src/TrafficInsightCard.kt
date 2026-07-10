@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 
 data class TrafficInsight(
     val kind: TrafficInsightKind,
@@ -165,7 +166,7 @@ fun formatTrafficInsight(
     latest_rate: ${formatRate(insight.latestRate)}
     profile: ${insight.profile.state.name.lowercase()}
     trend: ${insight.profile.trend.name.lowercase()}
-    burst_ratio: ${String.format("%.1fx", insight.profile.burstRatio)}
+    burst_ratio: ${String.format(Locale.ROOT, "%.1fx", insight.profile.burstRatio)}
     up_share: ${formatPercent(insight.profile.upShare)}
     down_share: ${formatPercent(insight.profile.downShare)}
     volatility: ${formatPercent(insight.profile.stabilityCv)}
