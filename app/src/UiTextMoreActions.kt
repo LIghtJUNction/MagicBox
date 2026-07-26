@@ -219,10 +219,7 @@ fun UiText.confirmDangerAction(command: String): String =
             "service stop" -> "确认停止 sing-box？停止后流量可能无法继续通过 MagicNet。"
             "config apply" -> "确认应用配置？配置生效时可能会重启相关运行状态。"
             "api close-all" -> "确认关闭当前连接？现有代理连接会被断开。"
-            "transparent set proxy" -> "确认切换到 Proxy 模式？当前连接可能会短暂中断。"
-            "transparent set external-tun" -> "确认切换到外部 TUN 模式？当前连接可能会短暂中断。"
-            "transparent set hybrid" -> "确认切换到 Hybrid 模式？当前连接可能会短暂中断。"
-            "transparent set tun" -> "确认切换到 TUN 模式？当前连接可能会短暂中断。"
+            "transparent apply" -> "确认重新应用 TUN？当前连接可能会短暂中断。"
             else -> "确认执行：$command"
         }
     } else {
@@ -233,10 +230,7 @@ fun UiText.confirmDangerAction(command: String): String =
             "service stop" -> "Stop sing-box? Traffic may stop using MagicNet until it is started again."
             "config apply" -> "Apply config? Runtime state may restart while the config takes effect."
             "api close-all" -> "Close current connections? Existing proxy connections will be dropped."
-            "transparent set proxy" -> "Switch to Proxy mode? Current connections may briefly drop."
-            "transparent set external-tun" -> "Switch to External TUN mode? Current connections may briefly drop."
-            "transparent set hybrid" -> "Switch to Hybrid mode? Current connections may briefly drop."
-            "transparent set tun" -> "Switch to TUN mode? Current connections may briefly drop."
+            "transparent apply" -> "Reapply TUN? Current connections may briefly drop."
             else -> "Confirm: $command"
         }
     }

@@ -55,20 +55,8 @@ fun ControlPanel(
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SmallButton(t.transparentModeProxy(), enabled = !loading, modifier = Modifier.weight(1f)) {
-                requestControlAction("transparent set proxy")
-            }
-            SmallButton(t.transparentModeExternalTun(), enabled = !loading, modifier = Modifier.weight(1f)) {
-                requestControlAction("transparent set external-tun")
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SmallButton(t.transparentModeHybrid(), enabled = !loading, modifier = Modifier.weight(1f)) {
-                requestControlAction("transparent set hybrid")
-            }
-            SmallButton("TUN", enabled = !loading, modifier = Modifier.weight(1f)) {
-                requestControlAction("transparent set tun")
+            SmallButton(t.reapplyTun(), enabled = !loading, modifier = Modifier.weight(1f)) {
+                requestControlAction("transparent apply")
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -109,14 +97,17 @@ fun ControlPanel(
     }
 }
 
-private fun currentTransparentMode(result: CliResult?): String =
-    result
+internal fun currentTransparentMode(result: CliResult?): String {
+    val reportedMode =
+        result
         ?.output
         ?.lineSequence()
         ?.firstOrNull { it.startsWith("mode=") }
         ?.substringAfter("=")
         ?.trim()
         .orEmpty()
+    return if (reportedMode.isBlank()) "" else "tun"
+}
 
 fun UiText.controlSummary(
     service: String,
@@ -130,10 +121,6 @@ fun UiText.controlSummary(
         "$service; transparent mode $transparentMode"
     }
 
-fun UiText.transparentModeProxy(): String = if (this === UiText.zh) "Proxy" else "Proxy"
-
-fun UiText.transparentModeExternalTun(): String = if (this === UiText.zh) "外部 TUN" else "External TUN"
-
-fun UiText.transparentModeHybrid(): String = if (this === UiText.zh) "Hybrid" else "Hybrid"
+fun UiText.reapplyTun(): String = if (this === UiText.zh) "重新应用 TUN" else "Reapply TUN"
 
 fun UiText.ensureService(): String = if (this === UiText.zh) "确保运行" else "Ensure"
