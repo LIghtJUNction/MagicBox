@@ -28,6 +28,7 @@ fun WebUiStatusCard() {
     var verify by remember { mutableStateOf<CliResult?>(null) }
     var install by remember { mutableStateOf<CliResult?>(null) }
     var panelUrl by remember { mutableStateOf(DefaultWebUiPanelUrl) }
+    var panelSha256 by remember { mutableStateOf(DefaultWebUiPanelSha256) }
     var copied by remember { mutableStateOf(false) }
     var confirmInstall by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
@@ -45,8 +46,13 @@ fun WebUiStatusCard() {
 
     fun installPanel() {
         val url = panelUrl.trim()
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            install = CliResult(false, "magicnet webui install-local <download-url>", t.webUiInstallInvalidUrl())
+        val sha256 = panelSha256.trim()
+        if (!url.startsWith("https://") || !isSha256(sha256)) {
+            install = CliResult(
+                false,
+                "magicnet webui install-local <https-url> <sha256> [name]",
+                "需要 HTTPS 下载链接和 64 位十六进制 SHA-256 校验值。",
+            )
             confirmInstall = false
             copied = false
             return
@@ -55,7 +61,7 @@ fun WebUiStatusCard() {
         confirmInstall = false
         copied = false
         scope.launch {
-            install = runMagicNetLong("webui install-local ${shellQuote(url)} zashboard")
+            install = runMagicNetLong("webui install-local ${shellQuote(url)} ${shellQuote(sha256)} zashboard")
             status = runMagicNet("webui status")
             loading = false
         }
@@ -103,9 +109,19 @@ fun WebUiStatusCard() {
             Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
+        TextInput(
+            panelSha256,
+            "面板包 SHA-256（64 位十六进制）",
+            {
+                panelSha256 = it
+                confirmInstall = false
+            },
+            Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
         SmallButton(
             if (confirmInstall) t.confirm() else t.webUiInstallLocal(),
-            enabled = !loading && panelUrl.isNotBlank(),
+            enabled = !loading && panelUrl.isNotBlank() && panelSha256.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (confirmInstall) installPanel() else confirmInstall = true
@@ -123,7 +139,11 @@ fun WebUiStatusCard() {
     }
 }
 
-private const val DefaultWebUiPanelUrl = "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
+private const val DefaultWebUiPanelUrl = "https://github.com/Zephyruso/zashboard/releases/download/v3.16.0/dist.zip"
+private const val DefaultWebUiPanelSha256 = "d103652ee04e9d73017230f483e0cb8875bf4bdf2c139faae47300ba7f5dfd16"
+
+private fun isSha256(value: String): Boolean =
+    value.length == 64 && value.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
 
 private data class WebUiStatus(
     val localReady: Boolean,
