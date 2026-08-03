@@ -77,6 +77,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+fun failedRecommendationResult(result: CliResult?): CliResult? = result?.takeUnless { it.success }
+
 @Composable
 fun AppsPage() {
     val t = LocalUiText.current
@@ -176,6 +178,10 @@ fun AppsPage() {
     }
 
     fun requestRecommendedBypass() {
+        failedRecommendationResult(recommendations)?.let { failure ->
+            lastCommand = failure
+            return
+        }
         val candidates = recommendedBypassCandidates()
         if (candidates.isEmpty()) {
             lastCommand = CliResult(true, "$MAGICNET_CLI app add-many bypass", t.noRecommendedBypass)
@@ -185,6 +191,11 @@ fun AppsPage() {
     }
 
     fun addRecommendedBypass() {
+        failedRecommendationResult(recommendations)?.let { failure ->
+            lastCommand = failure
+            pendingRecommendedBypass = false
+            return
+        }
         val candidates = recommendedBypassCandidates()
         if (candidates.isEmpty()) {
             lastCommand = CliResult(true, "$MAGICNET_CLI app add-many bypass", t.noRecommendedBypass)
