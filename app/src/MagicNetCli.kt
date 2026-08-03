@@ -285,8 +285,9 @@ fun isSafePackage(value: String): Boolean =
 fun parseAppSummary(output: String): AppSummary {
     var mode = "blacklist"
     val proxy = mutableListOf<String>()
+    val direct = mutableListOf<String>()
     val bypass = mutableListOf<String>()
-    var current: AppTarget? = null
+    var current: AppSummarySection? = null
 
     output.lineSequence().forEach { raw ->
         val line = raw.trim()
@@ -296,14 +297,22 @@ fun parseAppSummary(output: String): AppSummary {
                 mode = line.substringAfter("mode=").trim().ifBlank { mode }
                 current = null
             }
-            line.equals("proxy apps:", ignoreCase = true) -> current = AppTarget.Proxy
-            line.equals("bypass apps:", ignoreCase = true) -> current = AppTarget.Bypass
-            current == AppTarget.Proxy -> proxy.add(line)
-            current == AppTarget.Bypass -> bypass.add(line)
+            line.equals("proxy apps:", ignoreCase = true) -> current = AppSummarySection.Proxy
+            line.equals("direct apps:", ignoreCase = true) -> current = AppSummarySection.Direct
+            line.equals("bypass apps:", ignoreCase = true) -> current = AppSummarySection.Bypass
+            current == AppSummarySection.Proxy -> proxy.add(line)
+            current == AppSummarySection.Direct -> direct.add(line)
+            current == AppSummarySection.Bypass -> bypass.add(line)
         }
     }
 
-    return AppSummary(mode, proxy, bypass)
+    return AppSummary(mode, proxy, direct, bypass)
+}
+
+private enum class AppSummarySection {
+    Proxy,
+    Direct,
+    Bypass,
 }
 
 suspend fun checkForUpdates(t: UiText): UpdateState =

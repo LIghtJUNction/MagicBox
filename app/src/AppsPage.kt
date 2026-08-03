@@ -84,6 +84,7 @@ fun AppsPage() {
     val scope = rememberCoroutineScope()
     var appPolicy by remember { mutableStateOf<CliResult?>(null) }
     var packages by remember { mutableStateOf<CliResult?>(null) }
+    var recommendations by remember { mutableStateOf<CliResult?>(null) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
     var installedPackageNames by remember { mutableStateOf<Set<String>?>(null) }
     var lastCommand by remember { mutableStateOf<CliResult?>(null) }
@@ -108,9 +109,11 @@ fun AppsPage() {
         scope.launch {
             val policyJob = async { runMagicNet("app list") }
             val packagesJob = async { runMagicNet("app packages ${query.trim()}".trim()) }
+            val recommendationsJob = async { runMagicNet("app recommendations") }
             val installedJob = async { loadInstalledApps(context, query) }
             val installedNamesJob = async { loadInstalledPackageNames(context) }
             appPolicy = policyJob.await()
+            recommendations = recommendationsJob.await()
             val packageResult = packagesJob.await()
             packages = packageResult
             val localApps = installedJob.await()
@@ -155,9 +158,19 @@ fun AppsPage() {
 
     fun recommendedBypassCandidates(): List<String> {
         val summary = appPolicy?.takeIf { it.success }?.let { parseAppSummary(it.output) }
-        val active = (summary?.proxy.orEmpty() + summary?.bypass.orEmpty()).toSet()
+        val active = (summary?.proxy.orEmpty() + summary?.direct.orEmpty() + summary?.bypass.orEmpty()).toSet()
         val installed = packages?.takeIf { it.success }?.output?.lineSequence()?.filter { it.isNotBlank() }?.toSet().orEmpty()
-        return RECOMMENDED_BYPASS_PACKAGES.filter { pkg ->
+        val discovered =
+            recommendations
+                ?.takeIf { it.success }
+                ?.output
+                ?.lineSequence()
+                ?.map(String::trim)
+                ?.filter(::isSafePackage)
+                ?.distinct()
+                ?.toList()
+                .orEmpty()
+        return discovered.filter { pkg ->
             pkg !in active && (installed.isEmpty() || pkg in installed)
         }
     }

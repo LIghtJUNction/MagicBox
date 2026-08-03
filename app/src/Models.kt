@@ -94,6 +94,7 @@ data class RuntimeRuleSummary(
 data class AppSummary(
     val mode: String,
     val proxy: List<String>,
+    val direct: List<String>,
     val bypass: List<String>,
 )
 
