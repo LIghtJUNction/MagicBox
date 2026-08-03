@@ -14,30 +14,6 @@ const val MAGICBOX_RELEASES_URL = "https://github.com/LIghtJUNction/MagicBox/rel
 const val MAGICBOX_LATEST_RELEASE_API =
     "https://api.github.com/repos/LIghtJUNction/MagicBox/releases/latest"
 
-val RECOMMENDED_BYPASS_PACKAGES =
-    listOf(
-        "com.eg.android.AlipayGphone",
-        "com.tencent.mm",
-        "com.unionpay",
-        "com.taobao.taobao",
-        "com.tmall.wireless",
-        "com.jingdong.app.mall",
-        "com.xunmeng.pinduoduo",
-        "com.sankuai.meituan",
-        "com.autonavi.minimap",
-        "com.baidu.BaiduMap",
-        "com.MobileTicket",
-        "com.tencent.mobileqq",
-        "tv.danmaku.bili",
-        "com.ss.android.ugc.aweme",
-        "com.netease.cloudmusic",
-        "com.sina.weibo",
-        "com.zhihu.android",
-        "com.android.vending",
-        "com.google.android.gms",
-        "com.google.android.gsf",
-    )
-
 val LocalUiText = staticCompositionLocalOf { UiText.en }
 val SU_CANDIDATES =
     listOf(
