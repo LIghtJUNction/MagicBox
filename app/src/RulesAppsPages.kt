@@ -119,7 +119,7 @@ fun RulesPage() {
         loading = true
         copiedDomains = false
         scope.launch {
-            lastCommand = runMagicNet("route add-domain ${bucket.cli} $clean")
+            lastCommand = runMagicNet("route add-domain ${bucket.cli} ${shellQuote(clean)}")
             copiedWriteResult = false
             routeList = runMagicNet("route list")
             runtimeRuleSets = loadRuntimeRuleSets()
@@ -139,7 +139,7 @@ fun RulesPage() {
         loading = true
         copiedDomains = false
         scope.launch {
-            lastCommand = runMagicNet("route add-domain ${targetBucket.cli} $clean")
+            lastCommand = runMagicNet("route add-domain ${targetBucket.cli} ${shellQuote(clean)}")
             copiedWriteResult = false
             routeList = runMagicNet("route list")
             runtimeRuleSets = loadRuntimeRuleSets()
@@ -150,11 +150,16 @@ fun RulesPage() {
     }
 
     fun removeDomain(domain: String) {
+        val clean = domain.trim().lowercase()
+        if (!isSafeDomain(clean)) {
+            lastCommand = CliResult(false, "$MAGICNET_CLI route remove-domain ${bucket.cli} <domain>", t.invalidDomain(domain))
+            return
+        }
         loading = true
         copiedDomains = false
         pendingVisibleRemoval = false
         scope.launch {
-            lastCommand = runMagicNet("route remove-domain ${bucket.cli} $domain")
+            lastCommand = runMagicNet("route remove-domain ${bucket.cli} ${shellQuote(clean)}")
             copiedWriteResult = false
             routeList = runMagicNet("route list")
             runtimeRuleSets = loadRuntimeRuleSets()

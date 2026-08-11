@@ -37,7 +37,12 @@ suspend fun removeAppPolicies(
     val output =
         buildString {
             packageNames.forEach { pkg ->
-                val result = runMagicNet("app remove $pkg ${target.cli}")
+                val result =
+                    if (isSafePackage(pkg)) {
+                        runMagicNet("app remove ${shellQuote(pkg)} ${target.cli}")
+                    } else {
+                        CliResult(false, "$MAGICNET_CLI app remove <package> ${target.cli}", t.invalidPackage(pkg))
+                    }
                 appendLine(result.command)
                 appendLine(result.summary)
                 if (result.output.isNotBlank() && result.output != result.summary) appendLine(result.output)

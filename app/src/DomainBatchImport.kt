@@ -49,7 +49,7 @@ suspend fun addDomainBatch(
     val output =
         buildString {
             writable.forEach { domain ->
-                val result = runMagicNet("route add-domain ${bucket.cli} $domain")
+                val result = runMagicNet("route add-domain ${bucket.cli} ${shellQuote(domain)}")
                 appendLine(result.command)
                 appendLine(result.summary)
                 if (result.output.isNotBlank() && result.output != result.summary) appendLine(result.output)

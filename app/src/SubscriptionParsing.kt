@@ -75,7 +75,7 @@ suspend fun saveSingBoxSubscriptions(
         return CliResult(false, "$MAGICNET_CLI sub set-file sing-box <redacted>", appendSubscriptionInputReport(t.noValidSubscriptions(), input, t))
     }
     val payload = Base64.encodeToString(input.valid.joinToString(separator = "\n", postfix = "\n").toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
-    val result = runMagicNet("sub set-file sing-box $payload")
+    val result = runMagicNet("sub set-file sing-box ${shellQuote(payload)}")
     val output = appendSubscriptionInputReport(result.output, input, t)
     return result.copy(
         command = "$MAGICNET_CLI sub set-file sing-box <redacted>",
@@ -83,9 +83,6 @@ suspend fun saveSingBoxSubscriptions(
         summary = if (result.success) t.subscriptionSaved(input.valid.size) else result.summary,
     )
 }
-
-private fun isValidSubscriptionUrl(value: String): Boolean =
-    (value.startsWith("http://") || value.startsWith("https://")) && value.none { it.isWhitespace() }
 
 private fun appendSubscriptionInputReport(
     output: String,

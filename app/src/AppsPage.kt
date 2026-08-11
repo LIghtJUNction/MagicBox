@@ -110,7 +110,10 @@ fun AppsPage() {
         copiedInstalledPackages = false
         scope.launch {
             val policyJob = async { runMagicNet("app list") }
-            val packagesJob = async { runMagicNet("app packages ${query.trim()}".trim()) }
+            val cleanQuery = query.trim()
+            val packagesJob = async {
+                runMagicNet(if (cleanQuery.isBlank()) "app packages" else "app packages ${shellQuote(cleanQuery)}")
+            }
             val recommendationsJob = async { runMagicNet("app recommendations") }
             val installedJob = async { loadInstalledApps(context, query) }
             val installedNamesJob = async { loadInstalledPackageNames(context) }
@@ -141,7 +144,7 @@ fun AppsPage() {
         loading = true
         copiedPolicy = false
         scope.launch {
-            lastCommand = runMagicNet("app add $clean ${targetPolicy.cli}")
+            lastCommand = runMagicNet("app add ${shellQuote(clean)} ${targetPolicy.cli}")
             appPolicy = runMagicNet("app list")
             packageName = ""
             loading = false
@@ -149,10 +152,15 @@ fun AppsPage() {
     }
 
     fun removePackage(pkg: String) {
+        val clean = pkg.trim()
+        if (!isSafePackage(clean)) {
+            lastCommand = CliResult(false, "$MAGICNET_CLI app remove <package> ${target.cli}", t.invalidPackage(pkg))
+            return
+        }
         loading = true
         copiedPolicy = false
         scope.launch {
-            lastCommand = runMagicNet("app remove $pkg ${target.cli}")
+            lastCommand = runMagicNet("app remove ${shellQuote(clean)} ${target.cli}")
             appPolicy = runMagicNet("app list")
             loading = false
         }
@@ -206,7 +214,7 @@ fun AppsPage() {
         copiedPolicy = false
         pendingRecommendedBypass = false
         scope.launch {
-            lastCommand = runMagicNet("app add-many bypass ${candidates.joinToString(" ")}")
+            lastCommand = runMagicNet("app add-many bypass ${candidates.joinToString(" ") { shellQuote(it) }}")
             appPolicy = runMagicNet("app list")
             loading = false
         }
