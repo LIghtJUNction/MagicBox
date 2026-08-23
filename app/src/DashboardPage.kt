@@ -207,11 +207,18 @@ fun StatsPage(onTrafficRateChange: (Float) -> Unit) {
         pendingDangerAction = null
         loading = true
         scope.launch {
-            lastAction = runMagicNet(args)
+            // Core lifecycle commands can legitimately cross the short-query
+            // timeout while sing-box waits for TUN readiness.  Do not kill the
+            // su wrapper at six seconds and leave a detached core transition
+            // running behind a false timeout result.
+            lastAction = runMagicNetLong(args)
             copiedControlAction = false
-            service = runMagicNet("service status")
-            transparent = runMagicNet("transparent status")
-            health = runMagicNet("health")
+            val serviceJob = async { runMagicNet("service status") }
+            val transparentJob = async { runMagicNet("transparent status") }
+            val healthJob = async { runMagicNet("health") }
+            service = serviceJob.await()
+            transparent = transparentJob.await()
+            health = healthJob.await()
             copiedHealth = false
             copiedHealthIssues = false
             loading = false
