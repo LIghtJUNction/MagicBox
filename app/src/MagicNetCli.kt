@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -124,22 +125,30 @@ fun executeSu(args: List<String>, command: String, timeoutSeconds: Long = 6): Cl
             return CliResult(false, command, error.message ?: "Unable to start su")
         }
 
-    val output = StringBuilder()
+    val output = java.util.concurrent.atomic.AtomicReference("")
     val readerThread =
         Thread {
-            process.inputStream.bufferedReader().useLines { lines ->
-                lines.forEach { line -> output.appendLine(line) }
-            }
+            val text = runCatching { process.inputStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+            output.set(text)
         }.apply { start() }
 
     val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
     if (!finished) {
         process.destroyForcibly()
-        readerThread.join(500)
-        return CliResult(false, command, output.toString().trim().ifBlank { "Command timed out." })
+        process.waitFor(1, TimeUnit.SECONDS)
+        readerThread.join(1_000)
+        if (readerThread.isAlive) {
+            process.inputStream.close()
+            readerThread.join(1_000)
+        }
+        return CliResult(false, command, output.get().trim().ifBlank { "Command timed out." })
     }
-    readerThread.join(500)
-    return CliResult(process.exitValue() == 0, command, output.toString().trim())
+    readerThread.join(5_000)
+    if (readerThread.isAlive) {
+        process.inputStream.close()
+        readerThread.join(1_000)
+    }
+    return CliResult(process.exitValue() == 0, command, output.get().trim())
 }
 
 fun parseStats(output: String): LiveStats? {
@@ -281,6 +290,15 @@ fun isSafeDomain(value: String): Boolean =
 
 fun isSafePackage(value: String): Boolean =
     value.matches(Regex("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+"""))
+
+fun isValidSubscriptionUrl(value: String): Boolean {
+    if (value.any { it.isWhitespace() || it.isISOControl() }) return false
+    val uri = runCatching { URI(value) }.getOrNull() ?: return false
+    return uri.scheme.equals("https", ignoreCase = true) &&
+        uri.rawUserInfo == null &&
+        (uri.port == -1 || uri.port in 1..65535) &&
+        !uri.host.isNullOrBlank()
+}
 
 fun parseAppSummary(output: String): AppSummary {
     var mode = "blacklist"

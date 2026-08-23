@@ -266,7 +266,7 @@ fun ToolsPage(
         }
         loading = true
         scope.launch {
-            toolResult = runMagicNet("route add-domain warp $clean")
+            toolResult = runMagicNet("route add-domain warp ${shellQuote(clean)}")
             toolOutputCopied = false
             toolResult?.let { commandHistory = appendCommandHistory(context, it) }
             routes = runMagicNet("route list")
@@ -278,7 +278,7 @@ fun ToolsPage(
     fun removeWarpRouteDomain(domain: String) {
         loading = true
         scope.launch {
-            toolResult = runMagicNet("route remove-domain warp $domain")
+            toolResult = runMagicNet("route remove-domain warp ${shellQuote(domain)}")
             toolOutputCopied = false
             toolResult?.let { commandHistory = appendCommandHistory(context, it) }
             routes = runMagicNet("route list")

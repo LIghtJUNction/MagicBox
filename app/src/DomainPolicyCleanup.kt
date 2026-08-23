@@ -20,7 +20,12 @@ suspend fun removeDomainsFromBucket(
     val output =
         buildString {
             domains.forEach { domain ->
-                val result = runMagicNet("route remove-domain ${bucket.cli} $domain")
+                val result =
+                    if (isSafeDomain(domain)) {
+                        runMagicNet("route remove-domain ${bucket.cli} ${shellQuote(domain)}")
+                    } else {
+                        CliResult(false, "$MAGICNET_CLI route remove-domain ${bucket.cli} <domain>", t.invalidDomain(domain))
+                    }
                 appendLine(result.command)
                 appendLine(result.summary)
                 if (result.output.isNotBlank() && result.output != result.summary) appendLine(result.output)

@@ -53,7 +53,7 @@ suspend fun addPackageBatch(
             false,
         )
     }
-    val result = runMagicNet("app add-many ${target.cli} ${writable.joinToString(" ")}")
+    val result = runMagicNet("app add-many ${target.cli} ${writable.joinToString(" ") { shellQuote(it) }}")
     if (!result.success) {
         return PackageBatchImportResult(
             result.copy(output = appendPackageBatchReport(result.output, batch, existing, t)),
