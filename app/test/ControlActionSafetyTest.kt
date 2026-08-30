@@ -13,6 +13,8 @@ class ControlActionSafetyTest {
             "service restart sing-box",
             "service stop",
             "transparent apply",
+            "transparent set tun",
+            "transparent set ebpf",
             "config apply",
             "api close-all",
         ).forEach { command ->
@@ -27,7 +29,7 @@ class ControlActionSafetyTest {
         assertFalse(controlActionRequiresConfirmation("transparent set proxy"))
         assertFalse(controlActionRequiresConfirmation("transparent set external-tun"))
         assertFalse(controlActionRequiresConfirmation("transparent set hybrid"))
-        assertFalse(controlActionRequiresConfirmation("transparent set tun"))
+        assertFalse(controlActionRequiresConfirmation("transparent set auto"))
     }
 
     @Test
@@ -35,15 +37,21 @@ class ControlActionSafetyTest {
         assertTrue("启动" in UiText.zh.confirmDangerAction("service start"))
         assertTrue("Ensure" in UiText.en.confirmDangerAction("service ensure"))
         assertTrue("重启" in UiText.zh.confirmDangerAction("service restart sing-box"))
-        assertTrue("TUN" in UiText.zh.confirmDangerAction("transparent apply"))
+        assertTrue("透明模式" in UiText.zh.confirmDangerAction("transparent apply"))
+        assertTrue("eBPF" in UiText.zh.confirmDangerAction("transparent set ebpf"))
+        assertTrue("TUN" in UiText.en.confirmDangerAction("transparent set tun"))
         assertTrue("Apply config" in UiText.en.confirmDangerAction("config apply"))
     }
 
     @Test
-    fun legacyTransparentModesAreDisplayedAsTun() {
-        for (mode in listOf("proxy", "external", "external-tun", "hybrid", "tun")) {
+    fun transparentModesAreStrictlyReported() {
+        for (mode in listOf("tun", "ebpf")) {
             val result = CliResult(success = true, command = "transparent status", output = "mode=$mode")
-            assertTrue("$mode should normalize to tun", currentTransparentMode(result) == "tun")
+            assertTrue("$mode should be reported", currentTransparentMode(result) == mode)
+        }
+        for (mode in listOf("proxy", "external", "external-tun", "hybrid", "auto")) {
+            val result = CliResult(success = true, command = "transparent status", output = "mode=$mode")
+            assertTrue("$mode should be rejected", currentTransparentMode(result).isEmpty())
         }
     }
 }

@@ -402,9 +402,15 @@ fun StatsPage(onTrafficRateChange: (Float) -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DashboardTile(
                 title = t.mode,
-                value = transparent?.output?.substringAfter("mode=", "")?.lineSequence()?.firstOrNull()?.ifBlank { null }
-                    ?: healthEntries.firstOrNull { it.title == "TUN" }?.details?.substringBefore(",")
-                    ?: t.notReported,
+                value =
+                    currentTransparentMode(transparent).ifBlank {
+                        healthEntries
+                            .firstOrNull { it.title == "Dataplane" || it.title == "TUN" }
+                            ?.details
+                            ?.substringAfter("configured=mode:", "")
+                            ?.substringBefore(" ")
+                            .orEmpty()
+                    }.ifBlank { t.notReported },
                 modifier = Modifier.weight(1f),
             )
             DashboardTile(

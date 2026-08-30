@@ -7,6 +7,8 @@ private val CONTROL_ACTIONS_REQUIRING_CONFIRMATION =
         "service restart sing-box",
         "service stop",
         "transparent apply",
+        "transparent set tun",
+        "transparent set ebpf",
         "config apply",
         "api close-all",
     )

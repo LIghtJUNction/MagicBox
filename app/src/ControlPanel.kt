@@ -55,7 +55,7 @@ fun ControlPanel(
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SmallButton(t.reapplyTun(), enabled = !loading, modifier = Modifier.weight(1f)) {
+            SmallButton(t.reapplyTransparent(), enabled = !loading, modifier = Modifier.weight(1f)) {
                 requestControlAction("transparent apply")
             }
         }
@@ -100,13 +100,13 @@ fun ControlPanel(
 internal fun currentTransparentMode(result: CliResult?): String {
     val reportedMode =
         result
-        ?.output
-        ?.lineSequence()
-        ?.firstOrNull { it.startsWith("mode=") }
-        ?.substringAfter("=")
-        ?.trim()
-        .orEmpty()
-    return if (reportedMode.isBlank()) "" else "tun"
+            ?.output
+            ?.lineSequence()
+            ?.firstOrNull { it.startsWith("mode=") }
+            ?.substringAfter("=")
+            ?.trim()
+            .orEmpty()
+    return reportedMode.takeIf { it == "tun" || it == "ebpf" }.orEmpty()
 }
 
 fun UiText.controlSummary(
@@ -121,6 +121,6 @@ fun UiText.controlSummary(
         "$service; transparent mode $transparentMode"
     }
 
-fun UiText.reapplyTun(): String = if (this === UiText.zh) "重新应用 TUN" else "Reapply TUN"
+fun UiText.reapplyTransparent(): String = if (this === UiText.zh) "重新应用透明模式" else "Reapply transparent mode"
 
 fun UiText.ensureService(): String = if (this === UiText.zh) "确保运行" else "Ensure"

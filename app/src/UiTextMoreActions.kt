@@ -219,7 +219,9 @@ fun UiText.confirmDangerAction(command: String): String =
             "service stop" -> "确认停止 sing-box？停止后流量可能无法继续通过 MagicNet。"
             "config apply" -> "确认应用配置？配置生效时可能会重启相关运行状态。"
             "api close-all" -> "确认关闭当前连接？现有代理连接会被断开。"
-            "transparent apply" -> "确认重新应用 TUN？当前连接可能会短暂中断。"
+            "transparent apply" -> "确认重新应用当前透明模式？当前连接可能会短暂中断。"
+            "transparent set tun" -> "确认切换为 TUN？失败时 MagicNet 会恢复上一模式。"
+            "transparent set ebpf" -> "确认切换为 eBPF？失败时 MagicNet 会恢复上一模式。"
             else -> "确认执行：$command"
         }
     } else {
@@ -230,7 +232,9 @@ fun UiText.confirmDangerAction(command: String): String =
             "service stop" -> "Stop sing-box? Traffic may stop using MagicNet until it is started again."
             "config apply" -> "Apply config? Runtime state may restart while the config takes effect."
             "api close-all" -> "Close current connections? Existing proxy connections will be dropped."
-            "transparent apply" -> "Reapply TUN? Current connections may briefly drop."
+            "transparent apply" -> "Reapply the current transparent mode? Current connections may briefly drop."
+            "transparent set tun" -> "Switch to TUN? MagicNet will restore the previous mode on failure."
+            "transparent set ebpf" -> "Switch to eBPF? MagicNet will restore the previous mode on failure."
             else -> "Confirm: $command"
         }
     }
