@@ -341,14 +341,99 @@ suspend fun checkForUpdates(t: UiText): UpdateState =
                 .getOrElse { error ->
                     return@withContext UpdateState(t.updateCheckFailed, error.message ?: t.unableToReachGithub, false)
                 }
-        val latestVersion = latest.removePrefix("v").trim()
-        val hasUpdate = latestVersion != current
+        val hasUpdate = isReleaseNewer(latest, current)
         UpdateState(
             title = if (hasUpdate) t.updateAvailable(latest) else t.alreadyUpToDate,
             summary = if (hasUpdate) t.installedVersion(current) else t.installedMatchesLatest,
             checking = false,
         )
     }
+
+internal fun isReleaseNewer(
+    latestTag: String,
+    currentVersion: String,
+): Boolean {
+    val latest = SemanticVersion.parse(latestTag) ?: return false
+    val current = SemanticVersion.parse(currentVersion) ?: return false
+    return latest > current
+}
+
+private data class SemanticVersion(
+    val major: String,
+    val minor: String,
+    val patch: String,
+    val prerelease: List<String>?,
+) : Comparable<SemanticVersion> {
+    override fun compareTo(other: SemanticVersion): Int {
+        listOf(major to other.major, minor to other.minor, patch to other.patch).forEach { (left, right) ->
+            compareNumericIdentifiers(left, right).takeIf { it != 0 }?.let { return it }
+        }
+        return comparePrerelease(prerelease, other.prerelease)
+    }
+
+    companion object {
+        private val pattern =
+            Regex(
+                """^[vV]?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"""
+            )
+
+        fun parse(value: String): SemanticVersion? {
+            val match = pattern.matchEntire(value.trim()) ?: return null
+            val core = match.groupValues.slice(1..3)
+            val prerelease = match.groupValues[4].takeIf { it.isNotEmpty() }?.split('.')
+            if (
+                core.any(::hasNumericLeadingZero) ||
+                    prerelease.orEmpty().any(::hasNumericLeadingZero)
+            ) {
+                return null
+            }
+            return SemanticVersion(
+                major = core[0],
+                minor = core[1],
+                patch = core[2],
+                prerelease = prerelease,
+            )
+        }
+
+        private fun hasNumericLeadingZero(identifier: String): Boolean =
+            identifier.length > 1 && identifier[0] == '0' && identifier.all(Char::isDigit)
+    }
+}
+
+private fun comparePrerelease(
+    left: List<String>?,
+    right: List<String>?,
+): Int {
+    if (left == null || right == null) {
+        return when {
+            left == null && right == null -> 0
+            left == null -> 1
+            else -> -1
+        }
+    }
+    left.zip(right).forEach { (leftIdentifier, rightIdentifier) ->
+        val comparison =
+            when {
+                leftIdentifier.all(Char::isDigit) && rightIdentifier.all(Char::isDigit) ->
+                    compareNumericIdentifiers(leftIdentifier, rightIdentifier)
+                leftIdentifier.all(Char::isDigit) -> -1
+                rightIdentifier.all(Char::isDigit) -> 1
+                else -> leftIdentifier.compareTo(rightIdentifier)
+            }
+        if (comparison != 0) return comparison
+    }
+    return left.size.compareTo(right.size)
+}
+
+private fun compareNumericIdentifiers(
+    left: String,
+    right: String,
+): Int {
+    val normalizedLeft = left.trimStart('0').ifEmpty { "0" }
+    val normalizedRight = right.trimStart('0').ifEmpty { "0" }
+    return normalizedLeft.length.compareTo(normalizedRight.length).takeIf { it != 0 }
+        ?: normalizedLeft.compareTo(normalizedRight)
+}
 
 fun fetchLatestReleaseTag(): String {
     val connection = URL(MAGICBOX_LATEST_RELEASE_API).openConnection() as HttpURLConnection
