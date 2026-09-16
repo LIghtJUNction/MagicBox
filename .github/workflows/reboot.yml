@@ -1,0 +1,38 @@
+name: MagicBox reboot verification
+
+on:
+  push:
+    branches: [feat/token-cloud-reboot-20260916]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reboot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: MagicBox
+      - uses: actions/checkout@v4
+        with:
+          repository: LIghtJUNction/MagicNet
+          ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
+          path: MagicNet
+      - name: Archive exact input sources
+        run: |
+          git -C MagicBox rev-parse HEAD > SOURCE_REVISIONS.txt
+          git -C MagicNet rev-parse HEAD >> SOURCE_REVISIONS.txt
+          tar --exclude=.git -czf reboot-sources.tar.gz MagicBox MagicNet SOURCE_REVISIONS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reboot-input-sources
+          path: reboot-sources.tar.gz
+          retention-days: 7
+          if-no-files-found: error
