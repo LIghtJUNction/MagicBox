@@ -1,10 +1,12 @@
 package com.github.lightjunction.magicbox
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,12 +21,16 @@ class CloudVisualTest {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val file = File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png")
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(250) // Let SurfaceFlinger present the actual requested frame.
         instrumentation.uiAutomation.takeScreenshot().let { bitmap ->
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
         }
     }
     @Test fun realNativeScreensAreCapturedWithoutFakeNetworkData() {
+        compose.onNodeWithText("MagicBox").assertIsDisplayed()
+        SystemClock.sleep(800) // Wait for the system splash to leave the surface.
         capture("${BuildConfig.FLAVOR}-home")
         compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("Token 字符云").performClick()

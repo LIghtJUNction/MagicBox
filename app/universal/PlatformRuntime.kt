@@ -148,6 +148,15 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
         }
     } }
     internal suspend fun disconnect() = mutex.withLock { disconnectLocked() }
+    internal suspend fun serviceDestroyed() = mutex.withLock {
+        // A failed startup already cleaned up its process. Do not erase ERROR
+        // with a second empty disconnect when Android destroys the service.
+        if (process != null) {
+            val failure = current.value.takeIf { it.phase == Phase.ERROR }
+            disconnectLocked()
+            if (failure != null) current.value = failure
+        }
+    }
     private suspend fun disconnectLocked() {
         val child = process
         if (child != null) {
@@ -229,7 +238,7 @@ class ProxyRuntimeService : Service() {
         scope.cancel()
         // Root guardian independently handles process death. Normal service destruction
         // performs bounded cleanup without blocking Android's main thread.
-        CoroutineScope(Dispatchers.IO).launch { runCatching { runtime.disconnect() } }
+        CoroutineScope(Dispatchers.IO).launch { runCatching { runtime.serviceDestroyed() } }
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null

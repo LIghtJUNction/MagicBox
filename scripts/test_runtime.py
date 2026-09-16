@@ -7,6 +7,8 @@ import http.server
 import json
 from pathlib import Path
 import socket
+import re
+import urllib.request
 import subprocess
 import tempfile
 import threading
@@ -71,12 +73,21 @@ class RuntimeTests(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         def port():
             with socket.socket() as s: s.bind(('127.0.0.1',0)); return s.getsockname()[1]
-        upstream_port, local_port = port(), port()
+        upstream_port, local_port, api_port = port(), port(), port()
         result, report = self.convert(f'socks://127.0.0.1:{upstream_port}#offline-fixture')
         self.assertEqual(result.returncode, 0)
         node = report['outbounds'][0]; node['tag'] = 'egress'
         upstream = {'log':{'level':'error'},'inbounds':[{'type':'mixed','listen':'127.0.0.1','listen_port':upstream_port}], 'outbounds':[{'type':'direct','tag':'direct'}], 'route':{'final':'direct'}}
-        local = {'log':{'level':'error'},'inbounds':[{'type':'mixed','listen':'127.0.0.1','listen_port':local_port}], 'outbounds':[node], 'route':{'final':'egress'}}
+        # Exercise the actual production DNS constant, not a permissive test-only config.
+        source = (Path(__file__).resolve().parents[1] / 'app/universal/ProfileStore.kt').read_text()
+        match = re.search(r'val dns = JSONObject\("""(.*?)"""\)', source, re.S)
+        self.assertIsNotNone(match, 'production DNS fixture moved; update this extraction')
+        dns = json.loads(match.group(1))
+        local = {'log':{'level':'error'}, 'dns':dns,
+                 'inbounds':[{'type':'mixed','listen':'127.0.0.1','listen_port':local_port}],
+                 'outbounds':[node, {'type':'direct','tag':'direct'}],
+                 'route':{'final':'egress','default_domain_resolver':'bootstrap'},
+                 'experimental':{'clash_api':{'external_controller':f'127.0.0.1:{api_port}','secret':'offline-fixture'}}}
         processes = []
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -91,6 +102,9 @@ class RuntimeTests(unittest.TestCase):
                         break
                     except OSError: time.sleep(0.1)
                 else: self.fail('mixed listener did not start')
+                request = urllib.request.Request(f'http://127.0.0.1:{api_port}/version', headers={'Authorization':'Bearer offline-fixture'})
+                with urllib.request.urlopen(request, timeout=3) as result:
+                    self.assertIn('sing-box', json.load(result)['version'])
                 with conn:
                     target = f'127.0.0.1:{server.server_port}'
                     conn.sendall(f'GET http://{target}/proof HTTP/1.1\r\nHost: {target}\r\nConnection: close\r\n\r\n'.encode())

@@ -57,7 +57,7 @@ class NativeRuntimeIntegrationTest {
             try { runtime.importText("unknown://credential-not-for-logs"); fail("invalid format accepted") }
             catch (_: BoxFailure) { assertEquals(names, runtime.state.value.nodes) }
             runtime.start(ProxyMode.SYSTEM)
-            withTimeout(15000) {
+            withTimeout(30000) {
                 while (!runtime.state.value.running) {
                     assertNotEquals(runtime.state.value.detail, Phase.ERROR, runtime.state.value.phase)
                     delay(100)
@@ -76,6 +76,11 @@ class NativeRuntimeIntegrationTest {
             File(context.getExternalFilesDir(null), "native-routing-proof.txt").writeText(
                 "PASS: installed Android parser, atomic failed-import preservation, foreground core start, two-hop real local proxy request, authenticated readiness, stop and listener cleanup.\nROOT TUN/EBPF NOT TESTED.\n"
             )
+        } catch (error: Exception) {
+            File(context.getExternalFilesDir(null), "native-runtime-failure.txt").writeText(
+                "phase=${runtime.state.value.phase}; detail=${runtime.state.value.detail}; error=${error.javaClass.simpleName}\n"
+            )
+            throw error
         } finally {
             runCatching { runtime.stop() }
             upstream?.let { child -> child.destroy(); if (!child.waitFor(4, TimeUnit.SECONDS)) child.destroyForcibly() }

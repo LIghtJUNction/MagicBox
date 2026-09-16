@@ -72,7 +72,7 @@ internal class ProfileStore(context: Context) {
         val route = JSONObject().put("final", "egress").put("default_domain_resolver", "bootstrap").put("rules", rules)
         if (mode != ProxyMode.SYSTEM) route.put("auto_detect_interface", true)
         val dns = JSONObject("""{"servers":[
-            {"type":"https","tag":"bootstrap","server":"1.1.1.1","server_port":443,"path":"/dns-query","tls":{"enabled":true,"server_name":"cloudflare-dns.com"},"detour":"direct"},
+            {"type":"https","tag":"bootstrap","server":"1.1.1.1","server_port":443,"path":"/dns-query","tls":{"enabled":true,"server_name":"cloudflare-dns.com"}},
             {"type":"https","tag":"remote","server":"1.1.1.1","server_port":443,"path":"/dns-query","tls":{"enabled":true,"server_name":"cloudflare-dns.com"},"detour":"egress"}
         ],"final":"remote"}""")
         return JSONObject().put("log", JSONObject().put("level", "error")).put("inbounds", inbounds)

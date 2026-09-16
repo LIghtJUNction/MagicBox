@@ -109,23 +109,23 @@ fun TokenCloudApp() {
     BackHandler(page != 0) { page = 0 }
     CompositionLocalProvider(LocalCloud provides colors, LocalReducedMotion provides reduced) {
         Column(Modifier.fillMaxSize().background(colors.paper).safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 CloudText("{·}", 25, color = colors.accent, mono = true)
                 Spacer(Modifier.width(12.dp))
                 CloudText("MagicBox", 22, weight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 CloudText(if (BuildConfig.UI_ONLY) "UI / ROOT" else "UNIVERSAL", 10, mono = true, color = colors.muted)
             }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 28.dp, end = 28.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 28.dp, end = 28.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 when (page) {
                     0 -> {
                         item {
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(8.dp))
                             CloudText("TOKEN CLOUD / 01", 11, color = colors.muted, mono = true)
                             Spacer(Modifier.height(17.dp))
                             CloudText(if (state.running) "连接，在此\n自然发生。" else "自由连接。\n不必复杂。", 39, weight = FontWeight.Light, lineHeight = 49)
                         }
-                        item { TokenSurface(null, Modifier.fillMaxWidth().height(172.dp), reduced, true) {} }
+                        item { TokenSurface(null, Modifier.fillMaxWidth().height(128.dp), reduced, true) {} }
                         item {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(7.dp).clip(RoundedCornerShape(4.dp)).background(if (state.running) colors.accent else colors.muted))
