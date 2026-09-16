@@ -1,46 +1,11 @@
 name: Android
-
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
-  build-apks:
-    name: Build APKs
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
-
-      - name: Test
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
-
-      - name: Build
-        run: ./gradlew :app:assemble --stacktrace
-
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: MagicBox-apks
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+  verify:
+    uses: ./.github/workflows/reboot.yml
