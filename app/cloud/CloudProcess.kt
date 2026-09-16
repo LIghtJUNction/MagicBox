@@ -8,6 +8,7 @@ import kotlin.concurrent.thread
 internal data class ProcessResult(val code: Int, val stdout: String, val stderr: String, val complete: Boolean) {
     val success get() = complete && code == 0
 }
+private val ROOT_EXECUTABLES = listOf("/system/bin/su", "/system/xbin/su", "/debug_ramdisk/su", "/sbin/su", "su")
 
 /** Bounded stdout/stderr, concurrent stdin, and one deadline for the child process. */
 internal fun boundedProcess(args: List<String>, input: ByteArray = byteArrayOf(), seconds: Long = 12,
@@ -30,7 +31,7 @@ internal fun boundedProcess(args: List<String>, input: ByteArray = byteArrayOf()
                     if (accepted < n) truncated.set(true)
                 }
             }
-        }
+        }.onFailure { truncated.set(true) }
     }
     val out = reader(child.inputStream, stdout)
     val err = reader(child.errorStream, stderr)
@@ -55,7 +56,7 @@ internal class RootTransport {
     val authorized get() = prefix != null
     fun authorize(): Boolean {
         prefix = null
-        for (candidate in SU_CANDIDATES) {
+        for (candidate in ROOT_EXECUTABLES) {
             val standard = listOf(candidate, "-c")
             val namespace = listOf(candidate, "-M", "-c")
             var result = boundedProcess(namespace + "id -u", seconds = 35, limit = 8192)
