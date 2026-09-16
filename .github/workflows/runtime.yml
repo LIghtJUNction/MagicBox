@@ -1,0 +1,91 @@
+name: Pinned proxy runtime
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [arm64-v8a, x86_64, linux-x86_64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: MagicBox
+      - uses: actions/checkout@v4
+        with:
+          repository: LIghtJUNction/MagicNet
+          ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
+          path: MagicNet
+      - name: Exact core gitlink
+        run: |
+          git -C MagicNet submodule update --init --recursive sing-box
+          test "$(git -C MagicNet/sing-box rev-parse HEAD)" = 495fb0c8006c99ff37d87136267136022c7ea739
+      - uses: actions/checkout@v4
+        with:
+          repository: Fanju6/Proxylink
+          ref: 44929c0984944870297c260dc43a4aa9262f9e1c
+          path: Proxylink
+      - name: Verify common dependency
+        run: grep -F '44929c0984944870297c260dc43a4aa9262f9e1c' MagicNet/hooks/pre-build/4910.update_proxylink.sh
+      - name: Source and license provenance
+        run: |
+          mkdir -p output
+          printf 'MagicNet %s\nsing-box %s\nProxylink %s\nMagicBox adapters %s\n' "$(git -C MagicNet rev-parse HEAD)" "$(git -C MagicNet/sing-box rev-parse HEAD)" "$(git -C Proxylink rev-parse HEAD)" "$(git -C MagicBox rev-parse HEAD)" > output/PROVENANCE.txt
+          cp MagicNet/sing-box/LICENSE output/sing-box-LICENSE
+          find Proxylink -maxdepth 2 -iname 'LICENSE*' -exec cp '{}' output/Proxylink-LICENSE \;
+          if [ '${{ matrix.target }}' = linux-x86_64 ]; then
+            tar --exclude=.git -czf native-sources.tar.gz MagicNet/sing-box Proxylink MagicBox/native output
+          fi
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'linux-x86_64'
+        with:
+          name: native-input-sources
+          path: native-sources.tar.gz
+          retention-days: 14
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache-dependency-path: |
+            MagicNet/sing-box/go.sum
+            Proxylink/Proxylink/go.sum
+      - uses: actions/cache@v4
+        id: runtime-cache
+        with:
+          path: output
+          key: magicbox-runtime-v2-a94682e4-44929c09-${{ matrix.target }}-${{ hashFiles('MagicBox/native/**/*.go') }}
+      - name: Compile exact shared runtime and adapters
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case '${{ matrix.target }}' in
+            arm64-v8a) os=android; arch=arm64; export CGO_ENABLED=0 ;;
+            x86_64)
+              os=android; arch=amd64; export CGO_ENABLED=1
+              export ANDROID_NDK_HOME="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+              export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang"
+              test -x "$CC"
+              ;;
+            linux-x86_64) os=linux; arch=amd64; export CGO_ENABLED=0 ;;
+          esac
+          bash MagicNet/scripts/build-sing-box.sh "$os" "$arch" "$PWD/output/libsingbox.so" 2>&1 | tee build-core.log
+          (cd Proxylink/Proxylink && GOOS="$os" GOARCH="$arch" GOTOOLCHAIN=local GOWORK=off go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o "$GITHUB_WORKSPACE/output/libproxylink.so" "$GITHUB_WORKSPACE/MagicBox/native/converter/main.go") 2>&1 | tee build-parser.log
+          (cd MagicNet/sing-box && GOOS="$os" GOARCH="$arch" GOTOOLCHAIN=local GOWORK=off go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o "$GITHUB_WORKSPACE/output/libebpfcheck.so" "$GITHUB_WORKSPACE/MagicBox/native/ebpfcheck/main.go") 2>&1 | tee build-inspector.log
+          chmod 755 output/*.so
+          (cd output && sha256sum *.so > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.target }}
+          path: output
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-failure-${{ matrix.target }}
+          path: '*.log'

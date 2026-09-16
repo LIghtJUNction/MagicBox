@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "magicnet": {"repository": "LIghtJUNction/MagicNet", "revision": "a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd"},
+  "sing_box": {"repository": "LIghtJUNction/sing-box", "revision": "495fb0c8006c99ff37d87136267136022c7ea739", "version": "1.14.0", "source": "MagicNet pinned gitlink"},
+  "subscription": {"repository": "Fanju6/Proxylink", "revision": "44929c0984944870297c260dc43a4aa9262f9e1c", "source": "MagicNet 4910.update_proxylink.sh"},
+  "go": "1.26.7",
+  "android_abis": ["arm64-v8a", "x86_64"]
+}

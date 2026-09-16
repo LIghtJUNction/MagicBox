@@ -3,8 +3,8 @@
     <style name="Theme.MagicBox" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:navigationBarColor">#090D10</item>
-        <item name="android:statusBarColor">#090D10</item>
-        <item name="android:windowBackground">#090D10</item>
+        <item name="android:navigationBarColor">#151A16</item>
+        <item name="android:statusBarColor">#151A16</item>
+        <item name="android:windowBackground">#151A16</item>
     </style>
 </resources>
