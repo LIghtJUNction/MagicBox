@@ -1,0 +1,190 @@
+name: Publish verified Token Cloud preview
+on:
+  push:
+    branches: [release/token-cloud-preview]
+    paths: [.github/workflows/publish-token-cloud-preview.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-token-cloud-alpha-1
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'LIghtJUNction/MagicBox' && github.ref == 'refs/heads/release/token-cloud-preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: LIghtJUNction/MagicBox
+      VERIFIED_RUN: '35109446467'
+      VERIFIED_SHA: f3e8b72e4fbfa5099122a15e0399f114c96710eb
+      RELEASE_TAG: v0.2.0-alpha.1
+    steps:
+      - name: Verify exact successful source run
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$VERIFIED_RUN" > run.json
+          python3 - <<'PY'
+          import json, os
+          run = json.load(open('run.json'))
+          assert run['conclusion'] == 'success' and run['status'] == 'completed'
+          assert run['head_sha'] == os.environ['VERIFIED_SHA']
+          assert run['event'] == 'push' and run['path'] == '.github/workflows/reboot.yml'
+          assert run['repository']['full_name'] == os.environ['GH_REPO']
+          assert run['head_repository']['full_name'] == os.environ['GH_REPO']
+          PY
+          gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" > refs.json
+          python3 - <<'PY'
+          import json
+          assert json.load(open('refs.json')) == [], 'Tag already exists; do not overwrite a published preview.'
+          PY
+      - name: Retrieve the already-tested artifacts without rebuilding
+        run: |
+          set -euo pipefail
+          gh run download "$VERIFIED_RUN" --name MagicBox-preview-apks --dir delivery
+          gh run download "$VERIFIED_RUN" --name MagicBox-source --dir source
+          gh run download "$VERIFIED_RUN" --name native-input-sources --dir native
+          gh run download "$VERIFIED_RUN" --name MagicBox-native-visual-proof --dir visual
+          gh run download "$VERIFIED_RUN" --name MagicBox-build-report --dir reports
+          (cd delivery && sha256sum --check SHA256SUMS)
+      - name: Gate actual Android acceptance and exact reviewed APK hashes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, pathlib, tarfile, xml.etree.ElementTree as ET, zipfile
+          root = pathlib.Path('delivery')
+          expected = {
+            'MagicBox-0.2.0-alpha.1-universal-preview-debug.apk': '8b11b922b6ca06c273bce78cfb33cc3b56d9cbadaaf47f3f232788df57496a7c',
+            'MagicBox-0.2.0-alpha.1-controller-preview-debug.apk': 'a42dcedf87b3f2d95c66a9729b893398624a80292ffec3440bf7975071b4cadd',
+          }
+          for name, sha in expected.items():
+              assert hashlib.sha256((root/name).read_bytes()).hexdigest() == sha
+          proxy_libs = {'libsingbox.so','libproxylink.so','libebpfcheck.so'}
+          with zipfile.ZipFile(root/'MagicBox-0.2.0-alpha.1-controller-preview-debug.apk') as apk:
+              assert not any(pathlib.PurePosixPath(n).name in proxy_libs for n in apk.namelist())
+          with zipfile.ZipFile(root/'MagicBox-0.2.0-alpha.1-universal-preview-debug.apk') as apk:
+              for abi in ('arm64-v8a','x86_64'):
+                  for lib in proxy_libs: assert f'lib/{abi}/{lib}' in apk.namelist()
+          proof = pathlib.Path('visual/native-routing-proof.txt').read_text()
+          assert proof.startswith('PASS:') and 'ROOT TUN/EBPF NOT TESTED.' in proof
+          packages = pathlib.Path('visual/coinstalled-packages.txt').read_text().splitlines()
+          assert sorted(packages) == ['package:com.github.lightjunction.magicbox','package:com.github.lightjunction.magicbox.ui']
+          for theme in ('light','dark'):
+              for flavor in ('universal','controller'):
+                  assert 'OK (1 test)' in pathlib.Path(f'visual/{theme}/{flavor}-instrumentation.txt').read_text()
+                  for view in ('home','subscriptions','settings','token-split','token-reformed','token-drag'):
+                      assert pathlib.Path(f'visual/{theme}/{flavor}-{view}.png').stat().st_size > 10000
+          suites = list(pathlib.Path('reports').rglob('TEST-*.xml'))
+          assert suites
+          total = 0
+          for path in suites:
+              node = ET.parse(path).getroot()
+              assert int(node.get('failures', '0')) == 0 and int(node.get('errors', '0')) == 0
+              total += int(node.get('tests', '0'))
+          assert total == 172, total
+          forbidden = {'.ttf','.otf','.ttc','.woff','.woff2','.jks','.keystore'}
+          for archive in (pathlib.Path('source/MagicBox-source.tar.gz'),pathlib.Path('native/native-sources.tar.gz')):
+              with tarfile.open(archive) as tar:
+                  assert not any(pathlib.PurePosixPath(n.name).suffix.lower() in forbidden for n in tar.getmembers())
+          PY
+      - name: Assemble provenance and acceptance evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cp run.json evidence/verified-run.json
+          cp delivery/*-signature.txt delivery/*-package.txt delivery/runtime.lock.json evidence/
+          cp -r visual reports evidence/
+          zip -qr MagicBox-0.2.0-alpha.1-acceptance.zip evidence
+          cp source/MagicBox-source.tar.gz MagicBox-0.2.0-alpha.1-source.tar.gz
+          cp native/native-sources.tar.gz MagicBox-0.2.0-alpha.1-native-sources.tar.gz
+          cp delivery/*.apk .
+          printf 'source=%s\nverification=https://github.com/%s/actions/runs/%s\n' "$VERIFIED_SHA" "$GH_REPO" "$VERIFIED_RUN" > BUILD-INFO.txt
+          sha256sum *.apk MagicBox-0.2.0-alpha.1-acceptance.zip MagicBox-0.2.0-alpha.1-source.tar.gz MagicBox-0.2.0-alpha.1-native-sources.tar.gz BUILD-INFO.txt > SHA256SUMS
+          cat > RELEASE-NOTES.md <<'EOF'
+          # MagicBox 0.2.0-alpha.1 · Token 云集合
+
+          **可安装的测试预览版，使用 Android Debug 测试签名，不是正式稳定版。**
+
+          | 安装包 | 包名 | 依赖 |
+          | --- | --- | --- |
+          | universal · 75.62 MiB | `com.github.lightjunction.magicbox` | 内置 ARM64/x86_64 代理内核、订阅解析器与 eBPF 检查器，不依赖 MagicNet |
+          | controller · 8.14 MiB | `com.github.lightjunction.magicbox.ui` | 必须授予 root，并安装启用兼容的 MagicNet；不携带代理内核 |
+
+          两个应用已在 Android 模拟器中同时安装并验证。Android 8.0 及以上。请勿同时开启两套 root 透明代理；通用版会拒绝与已启用的 MagicNet 争抢路由。
+
+          ## 本轮实现
+
+          原生 Kotlin/Compose 界面，原创 Token 云集合交互：按钮整体消解为字符后重新固化，横向拖动散开再归位。纸墨配色、大留白、明暗主题、统一图标。几何预计算、最多 112 个字符、静止时不运行动画时钟，支持减少动态效果。
+
+          与 MagicNet 固定同一套 sing-box 分支和 Proxylink 解析器；版本见随包 `runtime.lock.json`。通用版提供本地 HTTP/SOCKS5、root TUN 和真实 eBPF 适配，UI 版调用 MagicNet 的模块接口。
+
+          ## 实际验收
+
+          - 两个 flavor 各 86 项单元测试通过。
+          - 六类订阅格式、非法输入、未知节点计数和真实两层本地代理转发的 Linux 集成测试通过。
+          - Android 上调用 APK 内真实组件，完成订阅导入、失败保留旧配置、前台服务启动、鉴权状态检查、两层真实本地代理转发、停止和监听端口清理。
+          - 两版同时安装，以及浅色/深色的首页、订阅、设置、字符分裂/复原/拖动截图测试通过。实际截图和原始测试报告见 acceptance.zip。
+
+          ## 尚未完成的范围
+
+          **KernelSU/Magisk/APatch 实机的 root TUN/eBPF、IPv6/DNS、SELinux enforcing、耗电与异常退出路由恢复尚未验收。不要把模拟器结果当作实机通过。** 未宣称 60/120fps 或具体实机性能。
+
+          系统代理是 `127.0.0.1:2080` 的本地 HTTP/SOCKS5，需要手动在 Wi-Fi 或应用内设置，不会自动接管蜂窝网络及所有应用。eBPF 需要兼容内核；检查失败不暗中退回 TUN。通用版 eBPF 仅 local 模式，不宣称热点共享接管。
+
+          当前解析入口为 Clash/Mihomo、sing-box、Xray、SIP008、节点 URI 与 Base64。Surge、Quantumult X、任意私有格式及尚未验证的协议选项不在支持承诺内。无法转换的节点会报错并保留旧配置，不声称“所有格式均已兼容”。
+
+          与旧安装包签名不一致时无法覆盖安装；卸载前先自行确认订阅已有备份。本版本测试签名不能替代长期生产签名方案。
+
+          ## 源码与核验
+
+          发布标签指向实际通过测试的提交 `f3e8b72e4fbfa5099122a15e0399f114c96710eb`，不是发布脚本所在的新提交。APK 为已验收的同一批产物，没有重新构建或替换。
+
+          CI：https://github.com/LIghtJUNction/MagicBox/actions/runs/35109446467
+
+          开发 PR：https://github.com/LIghtJUNction/MagicBox/pull/4
+
+          附带应用源码、固定第三方内核/解析器源码与许可证、SHA256SUMS、构建信息、测试报告与实际截图。不包含签名私钥。
+          EOF
+      - name: Create draft first, verify uploads, then publish prerelease
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            MagicBox-0.2.0-alpha.1-universal-preview-debug.apk \
+            MagicBox-0.2.0-alpha.1-controller-preview-debug.apk \
+            MagicBox-0.2.0-alpha.1-acceptance.zip \
+            MagicBox-0.2.0-alpha.1-source.tar.gz \
+            MagicBox-0.2.0-alpha.1-native-sources.tar.gz \
+            SHA256SUMS BUILD-INFO.txt \
+            --target "$VERIFIED_SHA" --draft --prerelease --latest=false \
+            --title 'MagicBox 0.2.0-alpha.1 · Token 云集合（双版本预览）' \
+            --notes-file RELEASE-NOTES.md
+          gh release view "$RELEASE_TAG" --json assets,isDraft,isPrerelease,targetCommitish > release.json
+          python3 - <<'PY'
+          import json,os
+          release=json.load(open('release.json'))
+          assert release['isDraft'] and release['isPrerelease']
+          names={a['name'] for a in release['assets']}
+          assert len(names)==7
+          assert 'MagicBox-0.2.0-alpha.1-universal-preview-debug.apk' in names
+          assert 'MagicBox-0.2.0-alpha.1-controller-preview-debug.apk' in names
+          assert release['targetCommitish']==os.environ['VERIFIED_SHA']
+          PY
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          gh release view "$RELEASE_TAG" --json url,isDraft,isPrerelease,assets > published-release.json
+          cat published-release.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MagicBox-preview-publication-proof
+          path: |
+            run.json
+            release.json
+            published-release.json
+            BUILD-INFO.txt
+            SHA256SUMS
+            RELEASE-NOTES.md
+          retention-days: 30
