@@ -38,6 +38,24 @@ android {
         manifestPlaceholders["appName"] = providers.gradleProperty("project.name").get()
     }
 
+    flavorDimensions += "edition"
+    productFlavors {
+        create("universal") {
+            dimension = "edition"
+            buildConfigField("boolean", "STANDALONE", "true")
+            manifestPlaceholders["appName"] = "MagicBox"
+            ndk { abiFilters += setOf("arm64-v8a", "x86_64") }
+        }
+        create("ui") {
+            dimension = "edition"
+            applicationIdSuffix = ".ui"
+            buildConfigField("boolean", "STANDALONE", "false")
+            manifestPlaceholders["appName"] = "MagicBox UI"
+        }
+    }
+
+    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/*.so" } }
+
     compileOptions {
         val javaVersion = JavaVersion.toVersion(providers.gradleProperty("android.jvm").get())
         sourceCompatibility = javaVersion
@@ -72,9 +90,16 @@ android {
     sourceSets {
         getByName("main") {
             manifest.srcFile("AndroidManifest.xml")
-            kotlin.srcDir("src")
+            kotlin.srcDirs("src", "cloud")
+            assets.srcDir("assets")
             res.srcDir("res")
         }
+        getByName("universal") {
+            manifest.srcFile("universal/AndroidManifest.xml")
+            jniLibs.srcDir("universal/jniLibs")
+            assets.srcDir("universal/assets")
+        }
+        getByName("ui") { manifest.srcFile("ui/AndroidManifest.xml") }
         getByName("test") {
             kotlin.srcDir("test")
         }
@@ -99,5 +124,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20250107")
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
