@@ -11,23 +11,81 @@ concurrency:
   group: token-cloud-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: LIghtJUNction/MagicNet
+          ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
+          path: dependencies/MagicNet
+          persist-credentials: false
+      - name: Initialize the shared core
+        run: git -C dependencies/MagicNet submodule update --init --recursive sing-box
+      - uses: actions/checkout@v4
+        with:
+          repository: Fanju6/Proxylink
+          ref: 44929c0984944870297c260dc43a4aa9262f9e1c
+          path: dependencies/Proxylink
+          persist-credentials: false
+      - name: Source provenance snapshot
+        run: |
+          tar --exclude=.git --exclude=.env -czf dependencies.tar.gz dependencies
+          git archive --format=zip -o MagicBox-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-snapshot
+          path: |
+            MagicBox-source.zip
+            dependencies.tar.gz
+          retention-days: 3
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dependencies/MagicNet/sing-box/go.mod
+          cache-dependency-path: |
+            dependencies/MagicNet/sing-box/go.sum
+            dependencies/Proxylink/Proxylink/go.sum
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: native-output
+          key: magicbox-native-v1-a94682e4-44929c09
+      - name: Build exact shared components
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-output/arm64-v8a native-output/x86_64 native-output/licenses
+          bash dependencies/MagicNet/scripts/build-sing-box.sh android arm64 "$PWD/native-output/arm64-v8a/libsingbox.so"
+          bash dependencies/MagicNet/scripts/build-sing-box.sh android amd64 "$PWD/native-output/x86_64/libsingbox.so"
+          for entry in arm64-v8a:arm64 x86_64:amd64; do
+            abi=${entry%:*}; arch=${entry#*:}
+            (cd dependencies/Proxylink/Proxylink && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -mod=readonly -trimpath -ldflags='-s -w -buildid=' -o "$GITHUB_WORKSPACE/native-output/$abi/libproxylink.so" .)
+          done
+          cp dependencies/MagicNet/LICENSE native-output/licenses/MagicNet.txt
+          cp dependencies/MagicNet/sing-box/LICENSE native-output/licenses/sing-box.txt
+          find dependencies/Proxylink -maxdepth 2 -iname '*license*' -type f -exec cp '{}' native-output/licenses/Proxylink.txt \;
+          git -C dependencies/MagicNet/sing-box rev-parse HEAD > native-output/sing-box.commit
+          (cd native-output && sha256sum */*.so > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-native-components
+          path: native-output/
+          if-no-files-found: error
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Source snapshot
-        run: git archive --format=zip -o MagicBox-source.zip HEAD
-      - uses: actions/upload-artifact@v4
-        with:
-          name: source-snapshot
-          path: MagicBox-source.zip
-          retention-days: 3
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew && ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
