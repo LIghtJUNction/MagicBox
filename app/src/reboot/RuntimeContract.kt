@@ -49,6 +49,10 @@ object TokenGeometry {
     fun spread(progress: Float): Float = sin(PI * progress.coerceIn(0f, 1f)).toFloat().coerceAtLeast(0f)
     fun x(index: Int): Float = ((index * 73 + 19) % 997) / 997f
     fun y(index: Int): Float = ((index * 137 + 41) % 991) / 991f
-    fun dx(index: Int): Float = cos(index * 2.399963f) * (0.12f + x(index) * 0.3f)
-    fun dy(index: Int): Float = sin(index * 2.399963f) * (0.12f + y(index) * 0.3f)
+    private val scatterX = FloatArray(COUNT) { cos(it * 2.399963f) * (0.12f + x(it) * 0.3f) }
+    private val scatterY = FloatArray(COUNT) { sin(it * 2.399963f) * (0.12f + y(it) * 0.3f) }
+    private val tapers = FloatArray(COUNT) { sin(x(it) * PI).toFloat() }
+    fun dx(index: Int): Float = scatterX[index]
+    fun dy(index: Int): Float = scatterY[index]
+    fun taper(index: Int): Float = tapers[index]
 }

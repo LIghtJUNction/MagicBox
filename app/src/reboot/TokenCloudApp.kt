@@ -2,19 +2,13 @@ package com.github.lightjunction.magicbox.reboot
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Paint
-import android.graphics.Typeface
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,15 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -46,14 +34,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.github.lightjunction.magicbox.BuildConfig
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 
-private data class CloudColors(val paper: Color, val ink: Color, val muted: Color, val line: Color, val accent: Color)
-private val LocalCloud = staticCompositionLocalOf {
+internal data class CloudColors(val paper: Color, val ink: Color, val muted: Color, val line: Color, val accent: Color)
+internal val LocalCloud = staticCompositionLocalOf {
     CloudColors(Color(0xFFF6F5F0), Color(0xFF202720), Color(0xFF697067), Color(0xFFE3E5DD), Color(0xFFAE482C))
 }
 
@@ -120,7 +107,7 @@ fun TokenCloudApp() {
         }
     }
     BackHandler(page != 0) { page = 0 }
-    CompositionLocalProvider(LocalCloud provides colors) {
+    CompositionLocalProvider(LocalCloud provides colors, LocalReducedMotion provides reduced) {
         Column(Modifier.fillMaxSize().background(colors.paper).safeDrawingPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 22.dp), verticalAlignment = Alignment.CenterVertically) {
                 CloudText("{·}", 25, color = colors.accent, mono = true)
@@ -136,7 +123,7 @@ fun TokenCloudApp() {
                             Spacer(Modifier.height(16.dp))
                             CloudText("TOKEN CLOUD / 01", 11, color = colors.muted, mono = true)
                             Spacer(Modifier.height(17.dp))
-                            CloudText(if (state.running) "连接，在此\n自然发生。" else "自在连接。\n留一点空白。", 39, weight = FontWeight.Light, lineHeight = 49)
+                            CloudText(if (state.running) "连接，在此\n自然发生。" else "自由连接。\n不必复杂。", 39, weight = FontWeight.Light, lineHeight = 49)
                         }
                         item { TokenSurface(null, Modifier.fillMaxWidth().height(172.dp), reduced, true) {} }
                         item {
@@ -221,7 +208,7 @@ fun TokenCloudApp() {
                                 BasicText(tag, Modifier.weight(1f), style = TextStyle(color = colors.ink, fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        if (state.nodes.isEmpty()) item { CloudText("还没有节点。这里不会用示例数据假装已经连接。", 13, color = colors.muted, lineHeight = 22) }
+                        if (state.nodes.isEmpty()) item { CloudText("导入订阅后，节点会出现在这里。", 13, color = colors.muted, lineHeight = 22) }
                     }
                     else -> {
                         item { CloudText("简单一点。", 36, weight = FontWeight.Light); Spacer(Modifier.height(12.dp)); CloudText("少一点干扰，多一点掌控。", 14, color = colors.muted) }
@@ -233,7 +220,7 @@ fun TokenCloudApp() {
                                 motionOff = !motionOff
                                 preferences.edit().putBoolean("reduced-motion", motionOff).apply()
                             }
-                            CloudText("点击分裂为字符，再汇聚固化。长按后拖动可打散粒子；松手后归位。静止时不持续刷新。", 13, color = colors.muted, lineHeight = 23)
+                            CloudText("点击分裂为字符，再汇聚固化。横向拖动可打散粒子；松手后归位。静止时不持续刷新。", 13, color = colors.muted, lineHeight = 23)
                             Spacer(Modifier.height(20.dp))
                             TextAction("检查运行状态", !busy) { perform { runtime.refresh(true) } }
                             TextAction("停止代理并恢复网络", !busy && !state.transitioning) { perform { runtime.stop() } }
@@ -278,57 +265,5 @@ private fun CloudText(text: String, size: Int, color: Color = LocalCloud.current
     }
 }
 @Composable private fun TextAction(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(vertical = 12.dp)) {
-        CloudText(text, 14, color = if (enabled) LocalCloud.current.accent else LocalCloud.current.muted)
-    }
-}
-
-@Composable
-private fun TokenSurface(label: String?, modifier: Modifier, reduced: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val colors = LocalCloud.current
-    val phase = remember { Animatable(1f) }
-    val scope = rememberCoroutineScope()
-    var job by remember { mutableStateOf<Job?>(null) }
-    var drag by remember { mutableFloatStateOf(0f) }
-    val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE } }
-    val hero = label == null
-    val tokenColor = if (hero) colors.accent else colors.paper
-    fun animate(from: Float = 0f) {
-        job?.cancel()
-        if (!reduced) job = scope.launch { phase.snapTo(from); phase.animateTo(1f, tween(680)) }
-    }
-    LaunchedEffect(reduced) { if (reduced) { job?.cancel(); drag = 0f; phase.snapTo(1f) } }
-    Box(modifier.semantics { if (hero) contentDescription = "Token 字符云" }.clip(RoundedCornerShape(if (hero) 30.dp else 22.dp))
-        .background(if (hero) Color.Transparent else if (enabled) colors.ink else colors.muted)
-        .pointerInput(reduced, enabled) {
-            if (enabled && !reduced) detectDragGesturesAfterLongPress(
-                onDragStart = { job?.cancel(); drag = 0.7f },
-                onDrag = { change, amount -> change.consume(); drag = (drag + amount.x / size.width.coerceAtLeast(1)).coerceIn(0.15f, 1f) },
-                onDragEnd = { drag = 0f; animate(0.5f) },
-                onDragCancel = { drag = 0f; animate(0.5f) },
-            )
-        }
-        .clickable(enabled = enabled, role = Role.Button, onClickLabel = label ?: "打散字符云") { animate(); onClick() }, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val spread = if (reduced) 0f else maxOf(drag, TokenGeometry.spread(phase.value))
-            if (hero || spread > 0.01f) {
-                paint.color = tokenColor.toArgb()
-                paint.textSize = (if (hero) 11.dp else 10.dp).toPx()
-                repeat(TokenGeometry.COUNT) { i ->
-                    val u = TokenGeometry.x(i)
-                    val v = TokenGeometry.y(i)
-                    val taper = kotlin.math.sin(u * Math.PI).toFloat()
-                    val homeX = (0.08f + u * 0.84f) * size.width
-                    val homeY = (0.5f + (v - 0.5f) * (if (hero) taper * 0.85f else 0.42f)) * size.height
-                    val x = homeX + TokenGeometry.dx(i) * size.width * spread
-                    val y = homeY + TokenGeometry.dy(i) * size.height * spread
-                    paint.alpha = ((if (hero) 0.22f + v * 0.66f else spread) * 255).toInt().coerceIn(0, 255)
-                    drawContext.canvas.nativeCanvas.drawText(TokenGeometry.glyphs[i % TokenGeometry.glyphs.size], x, y, paint)
-                }
-            }
-        }
-        if (label != null) Box(Modifier.graphicsLayer { alpha = 1f - maxOf(drag, TokenGeometry.spread(phase.value)) }) {
-            CloudText(label, 16, color = colors.paper, weight = FontWeight.SemiBold)
-        }
-    }
+    TokenSurface(text, Modifier.fillMaxWidth().heightIn(min = 48.dp), LocalReducedMotion.current, enabled, plain = true, onClick = onClick)
 }
