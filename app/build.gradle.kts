@@ -17,8 +17,8 @@ android {
         applicationId = providers.gradleProperty("project.namespace.base").get()
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.2.0-alpha.1"
+        versionCode = providers.gradleProperty("project.version.code").get().toInt()
+        versionName = providers.gradleProperty("project.version.name").get()
         manifestPlaceholders["appName"] = "MagicBox"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
     implementation("androidx.compose.animation:animation-core")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)

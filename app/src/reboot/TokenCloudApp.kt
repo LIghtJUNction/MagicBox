@@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -234,6 +236,7 @@ fun TokenCloudApp() {
                             CloudText("点击分裂为字符，再汇聚固化。长按后拖动可打散粒子；松手后归位。静止时不持续刷新。", 13, color = colors.muted, lineHeight = 23)
                             Spacer(Modifier.height(20.dp))
                             TextAction("检查运行状态", !busy) { perform { runtime.refresh(true) } }
+                            TextAction("停止代理并恢复网络", !busy && !state.transitioning) { perform { runtime.stop() } }
                             if (!BuildConfig.UI_ONLY) TextAction("打开 Wi-Fi 设置") { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
                             TextAction("查看开源许可") {
                                 message = "MagicBox：AGPL-3.0；sing-box 与 Proxylink 的固定版本、源码和许可证随构建产物一起提供。"
@@ -295,7 +298,7 @@ private fun TokenSurface(label: String?, modifier: Modifier, reduced: Boolean, e
         if (!reduced) job = scope.launch { phase.snapTo(from); phase.animateTo(1f, tween(680)) }
     }
     LaunchedEffect(reduced) { if (reduced) { job?.cancel(); drag = 0f; phase.snapTo(1f) } }
-    Box(modifier.clip(RoundedCornerShape(if (hero) 30.dp else 22.dp))
+    Box(modifier.semantics { if (hero) contentDescription = "Token 字符云" }.clip(RoundedCornerShape(if (hero) 30.dp else 22.dp))
         .background(if (hero) Color.Transparent else if (enabled) colors.ink else colors.muted)
         .pointerInput(reduced, enabled) {
             if (enabled && !reduced) detectDragGesturesAfterLongPress(

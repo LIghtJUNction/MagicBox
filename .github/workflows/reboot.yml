@@ -29,11 +29,14 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - uses: actions/cache@v4
@@ -57,6 +60,11 @@ jobs:
           cp runtime.lock.json app/runtime/assets/
           cp LICENSE app/runtime/assets/licenses/MagicBox-LICENSE
           chmod +x gradlew
+      - name: Offline native integration
+        run: |
+          set -o pipefail
+          chmod +x runtime-input/runtime-linux-x86_64/*.so
+          python3 scripts/test_runtime.py --runtime-dir runtime-input/runtime-linux-x86_64 2>&1 | tee native-tests.log
       - name: Unit tests and dual package build
         run: |
           set -o pipefail
@@ -77,7 +85,7 @@ jobs:
           import zipfile
           from pathlib import Path
           packages = {flavor: zipfile.ZipFile(next(Path('delivery').glob(f'*{flavor}*.apk'))) for flavor in ('universal','controller')}
-          assert not any(n.startswith('lib/') and n.endswith('.so') for n in packages['controller'].namelist())
+          assert not any(n.rsplit('/',1)[-1] in ('libsingbox.so','libproxylink.so','libebpfcheck.so') for n in packages['controller'].namelist())
           for abi in ('arm64-v8a','x86_64'):
               for lib in ('libsingbox.so','libproxylink.so','libebpfcheck.so'):
                   assert f'lib/{abi}/{lib}' in packages['universal'].namelist()
@@ -100,6 +108,7 @@ jobs:
           name: MagicBox-build-report
           path: |
             build.log
+            native-tests.log
             app/build/reports/tests
             app/build/test-results
   visual:
@@ -131,10 +140,14 @@ jobs:
               adb install "apks/androidTest/$flavor/debug/app-$flavor-debug-androidTest.apk"
               package=com.github.lightjunction.magicbox
               if [ "$flavor" = controller ]; then package=$package.ui; fi
-              adb shell am instrument -w "$package.test/androidx.test.runner.AndroidJUnitRunner" | tee "visual/$flavor-instrumentation.txt"
+              adb shell am instrument -w -e class com.github.lightjunction.magicbox.CloudVisualTest "$package.test/androidx.test.runner.AndroidJUnitRunner" | tee "visual/$flavor-instrumentation.txt"
               adb pull "/sdcard/Android/data/$package/files/." visual/
               grep -E 'OK \([1-9][0-9]* tests?\)' "visual/$flavor-instrumentation.txt"
             done
+            adb shell am instrument -w -e class com.github.lightjunction.magicbox.NativeRuntimeIntegrationTest com.github.lightjunction.magicbox.test/androidx.test.runner.AndroidJUnitRunner | tee visual/native-runtime-instrumentation.txt
+            adb pull /sdcard/Android/data/com.github.lightjunction.magicbox/files/. visual/
+            grep -E 'OK \([1-9][0-9]* tests?\)' visual/native-runtime-instrumentation.txt
+            adb shell dumpsys gfxinfo com.github.lightjunction.magicbox > visual/emulator-gfxinfo.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

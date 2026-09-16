@@ -29,13 +29,18 @@ object PlatformRuntime {
 
 class NativeRuntime internal constructor(private val context: Context) : RuntimePort {
     private val store = ProfileStore(context)
-    private val current = MutableStateFlow(BoxState(nodes = store.names(), selected = store.selected(), detail = if (store.names().isEmpty()) "添加订阅，开始连接。" else "内置内核已准备好。"))
+    private val current = MutableStateFlow(BoxState())
+    private var profileLoaded = false
     override val state = current.asStateFlow()
     private val mutex = Mutex()
-    private var process: Process? = null
+    @Volatile private var process: Process? = null
+    internal val hasLiveProcess: Boolean get() = process?.isAlive == true
+    internal fun reportFailure(error: Exception) {
+        current.value = current.value.copy(phase = Phase.ERROR, detail = (error as? BoxFailure)?.message ?: "操作未完成，可从设置页重试停止代理。")
+    }
     private var rootMode = false
     private var secret = ""
-    private val pidFile = File(store.directory, "core.pid")
+    private val pidFile get() = File(store.directory, "core.pid")
     private fun binary(name: String): String {
         val file = File(context.applicationInfo.nativeLibraryDir, name)
         if (!file.isFile || !file.canExecute()) throw BoxFailure("此安装包缺少兼容的内置组件，请使用完整通用版。")
@@ -43,7 +48,7 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
     }
     override suspend fun start(mode: ProxyMode) {
         if (current.value.running || current.value.transitioning) return
-        if (store.read() == null) throw BoxFailure("请先在订阅页导入节点。")
+        if (withContext(Dispatchers.IO) { store.read() } == null) throw BoxFailure("请先在订阅页导入节点。")
         binary("libsingbox.so")
         current.value = current.value.copy(phase = Phase.STARTING, mode = mode, detail = "正在验证配置与运行条件。")
         try { context.startForegroundService(Intent(context, ProxyRuntimeService::class.java).setAction("connect").putExtra("mode", mode.name)) }
@@ -66,7 +71,7 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
                 if (mode == ProxyMode.EBPF) {
                     val probe = EngineIO.rootArgs(core, "tools", "ebpf", "status", "--mode", "local", "--network", "tcp,udp", "--json", seconds = 15)
                     val data = runCatching { JSONObject(probe.text) }.getOrNull()
-                    if (probe.code != 0 || data?.optJSONObject("summary")?.optInt("required_failures", -1) != 0 || data.optString("result") != "supported") throw BoxFailure("设备未通过 eBPF 能力检查；没有回退成 TUN。")
+                    if (probe.code != 0 || data?.optJSONObject("summary")?.optInt("required_failures", -1) != 0 || data?.optString("result") != "supported") throw BoxFailure("设备未通过 eBPF 能力检查；没有回退成 TUN。")
                 }
             }
             val profile = store.read() ?: throw BoxFailure("请先导入订阅。")
@@ -76,26 +81,26 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
             else EngineIO.command(listOf(core, "check", "-c", config.absolutePath)).requireSuccess("内核未接受订阅配置。")
             pidFile.writeText("")
             process = if (rootMode) {
-                // The root guardian watches the exact app process start time. If Android kills
-                // the app, the core receives TERM and can restore its routes/BPF attachments.
+                // The guardian monitors both app and child start times, not just reused PIDs.
                 val script = """
                     umask 077
                     stamp() { line=${'$'}(cat /proc/${'$'}1/stat 2>/dev/null) || return 1; rest=${'$'}{line##*) }; set -- ${'$'}rest; shift 19; printf '%s' "${'$'}1"; }
                     owner=${android.os.Process.myPid()}
                     original=${'$'}(stamp "${'$'}owner") || exit 1
                     child=''
-                    cleanup() { [ -z "${'$'}child" ] || { kill -TERM "${'$'}child" 2>/dev/null || :; wait "${'$'}child" 2>/dev/null || :; }; }
+                    cleanup() { target=${'$'}child; child=''; [ -z "${'$'}target" ] || { if [ "${'$'}(stamp "${'$'}target")" = "${'$'}child_stamp" ]; then kill -TERM "${'$'}target" 2>/dev/null || :; fi; wait "${'$'}target" 2>/dev/null || :; }; }
                     trap cleanup EXIT HUP INT TERM
                     ${InputPolicy.quote(core)} run -c ${InputPolicy.quote(config.absolutePath)} >/dev/null 2>&1 &
                     child=${'$'}!
+                    child_stamp=${'$'}(stamp "${'$'}child") || exit 1
                     printf '%s' "${'$'}child" > ${InputPolicy.quote(pidFile.absolutePath)}
-                    while kill -0 "${'$'}child" 2>/dev/null && [ "${'$'}(stamp "${'$'}owner")" = "${'$'}original" ]; do sleep 2; done
+                    while [ "${'$'}(stamp "${'$'}child")" = "${'$'}child_stamp" ] && [ "${'$'}(stamp "${'$'}owner")" = "${'$'}original" ]; do sleep 2; done
                 """.trimIndent()
                 val su = listOf("/system/bin/su", "/system/xbin/su", "/debug_ramdisk/su", "/sbin/su").firstOrNull { File(it).canExecute() } ?: "su"
                 ProcessBuilder(su, "-c", script).redirectErrorStream(true).start()
             } else ProcessBuilder(core, "run", "-c", config.absolutePath).redirectErrorStream(true).start()
             val owned = process!!
-            Thread { runCatching { owned.inputStream.use { it.copyTo(java.io.OutputStream.nullOutputStream()) } } }.apply { isDaemon = true; start() }
+            Thread { runCatching { owned.inputStream.use { stream -> val buffer = ByteArray(4096); while (stream.read(buffer) >= 0) { /* Drain without logging credentials. */ } } } }.apply { isDaemon = true; start() }
             repeat(40) {
                 if (!owned.isAlive) throw BoxFailure("代理内核未能启动；可能存在端口、内核或权限冲突。")
                 if (ready(mode)) {
@@ -132,12 +137,16 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
             }
         }
     }
-    override suspend fun refresh(requestPermission: Boolean) = mutex.withLock {
+    override suspend fun refresh(requestPermission: Boolean) = withContext(Dispatchers.IO) { mutex.withLock {
+        if (!profileLoaded) {
+            current.value = current.value.copy(nodes = store.names(), selected = store.selected())
+            profileLoaded = true
+        }
         if (current.value.running && !ready(current.value.mode)) {
             runCatching { disconnectLocked() }
             current.value = current.value.copy(phase = Phase.ERROR, detail = "连接已失去就绪状态，不会继续显示已连接。")
         }
-    }
+    } }
     internal suspend fun disconnect() = mutex.withLock { disconnectLocked() }
     private suspend fun disconnectLocked() {
         val child = process
@@ -160,7 +169,7 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
         secret = ""
         current.value = current.value.copy(phase = Phase.IDLE, detail = "已断开。你的订阅仍保留在设备上。")
     }
-    override suspend fun importText(text: String) = mutex.withLock {
+    override suspend fun importText(text: String) = withContext(Dispatchers.IO) { mutex.withLock {
         if (current.value.running || current.value.transitioning || process?.isAlive == true) throw BoxFailure("请先断开连接再更换订阅。")
         val raw = EngineIO.subscription(text)
         val source = File.createTempFile("subscription-", ".txt", store.directory)
@@ -178,12 +187,12 @@ class NativeRuntime internal constructor(private val context: Context) : Runtime
             store.save(profile)
             current.value = current.value.copy(nodes = store.names(), selected = store.selected(), phase = Phase.IDLE, detail = "订阅已验证并保存在本机。")
         } finally { source.delete(); output.delete(); validation.delete() }
-    }
-    override suspend fun select(tag: String) = mutex.withLock {
+    } }
+    override suspend fun select(tag: String) = withContext(Dispatchers.IO) { mutex.withLock {
         if (current.value.running || current.value.transitioning) throw BoxFailure("请先断开再切换节点。")
         store.select(tag)
         current.value = current.value.copy(selected = tag)
-    }
+    } }
 }
 
 class ProxyRuntimeService : Service() {
@@ -206,14 +215,16 @@ class ProxyRuntimeService : Service() {
             if (intent?.action == "connect") {
                 val mode = runCatching { ProxyMode.valueOf(intent.getStringExtra("mode").orEmpty()) }.getOrDefault(ProxyMode.SYSTEM)
                 runtime.connect(mode)
-                if (!runtime.state.value.running) stopSelf(startId)
+                if (!runtime.state.value.running && !runtime.hasLiveProcess) stopSelf(startId)
             } else {
-                try { runtime.disconnect(); stopSelf(startId) } catch (_: Exception) { /* Keep foreground stop action available. */ }
+                try { runtime.disconnect(); stopSelf(startId) } catch (error: Exception) { runtime.reportFailure(error) }
             }
         }
         return START_NOT_STICKY
     }
-    override fun onTaskRemoved(rootIntent: Intent?) { scope.launch { runCatching { runtime.disconnect() }; stopSelf() } }
+    override fun onTaskRemoved(rootIntent: Intent?) { scope.launch {
+        try { runtime.disconnect(); stopSelf() } catch (error: Exception) { runtime.reportFailure(error) }
+    } }
     override fun onDestroy() {
         scope.cancel()
         // Root guardian independently handles process death. Normal service destruction

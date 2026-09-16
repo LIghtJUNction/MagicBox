@@ -91,6 +91,7 @@ private class ModuleRuntime : RuntimePort {
     override suspend fun stop() = lock.withLock {
         authorize()
         try { call("service", "stop", seconds = 45) } finally { snapshot() }
+        Unit
     }
     override suspend fun importText(text: String) = lock.withLock {
         authorize()
@@ -104,8 +105,14 @@ private class ModuleRuntime : RuntimePort {
             "trap \"$quoted webui payload remove subscription '$name' >/dev/null 2>&1\" EXIT; " +
             "while IFS= read -r chunk; do $quoted webui payload append subscription '$name' \"\$chunk\" >/dev/null; done; " +
             "$quoted webui payload $action '$name'"
-        val chunks = source.toByteArray(Charsets.UTF_8).toList().chunked(24576).joinToString("\n", postfix = "\n") {
-            Base64.encodeToString(it.toByteArray(), Base64.NO_WRAP)
+        val bytes = source.toByteArray(Charsets.UTF_8)
+        val chunks = buildString(bytes.size * 4 / 3 + 1024) {
+            var offset = 0
+            while (offset < bytes.size) {
+                val length = minOf(24576, bytes.size - offset)
+                append(Base64.encodeToString(bytes, offset, length, Base64.NO_WRAP)).append('\n')
+                offset += length
+            }
         }
         EngineIO.root(script, chunks.toByteArray(), seconds = 90).requireSuccess("模块未接受订阅；请检查格式或订阅源。")
         updateNodes()
