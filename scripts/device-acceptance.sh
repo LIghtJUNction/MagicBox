@@ -12,6 +12,11 @@ collect_evidence() {
   adb logcat -d -b crash > evidence/device/crashes.txt || true
 }
 trap collect_evidence EXIT
+adb shell settings put system screen_off_timeout 1800000
+adb shell svc power stayon true
+# Ephemeral emulator setup only. Never hide a MagicBox ANR or dismiss its errors.
+adb shell am force-stop com.google.android.apps.nexuslauncher
+adb shell cmd uimode night no
 for edition in universal ui; do
   apk=$(find validated -name "app-$edition-debug.apk" -print -quit)
   test -n "$apk"
@@ -34,5 +39,6 @@ for edition in universal ui; do
   adb uninstall "$package.test"
 done
 collect_evidence
+trap - EXIT
 ! grep -q 'Process: com.github.lightjunction.magicbox' evidence/device/crashes.txt || failed=1
 exit "$failed"

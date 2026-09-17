@@ -90,8 +90,12 @@ class CloudActivity : ComponentActivity() {
 
     private inner class Bridge {
         @JavascriptInterface fun request(id: String, action: String, payload: String) {
-            if (!id.matches(Regex("[0-9]{1,12}")) || payload.length > CLOUD_INPUT_LIMIT + 4096) return
-            val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: return
+            if (!id.matches(Regex("[0-9]{1,12}"))) return
+            val parsed = if (payload.length <= CLOUD_INPUT_LIMIT * 3 + 4096) runCatching { cloudJson(payload) }.getOrNull() else null
+            if (parsed == null) {
+                runOnUiThread { reply(id, JSONObject().put("ok", false).put("message", "请求过大或格式无效。")) }
+                return
+            }
             if (action in setOf("file", "about", "advanced", "appearance")) {
                 runOnUiThread {
                     if (!alive || isFinishing) return@runOnUiThread

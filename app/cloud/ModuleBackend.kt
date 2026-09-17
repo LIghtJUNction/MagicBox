@@ -30,6 +30,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         lastNodeRead = 0L
     }
     override fun authorize() {
+        compatible = false; ebpf = false; nodes = JSONArray(); selected = ""
         super.authorize()
         val exists = root.run("test -x '$MAGICNET_CLI' && test ! -f '/data/adb/modules/MagicNet/disable' && test ! -f '/data/adb/modules/MagicNet/remove'")
         requireCloud(exists.success, "未找到已启用的 MagicNet 模块。此 UI 版不能独立运行。")
@@ -40,7 +41,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
             "MagicNet 不支持所需的机器接口，请先更新模块。")
         compatible = true
         val probe = root.run("'/data/adb/modules/MagicNet/bin/sing-box' tools ebpf status --mode local --network tcp,udp --json", seconds = 15)
-        ebpf = probe.success && runCatching { JSONObject(probe.stdout).optString("result") == "supported" }.getOrDefault(false)
+        ebpf = probe.success && runCatching { cloudJson(probe.stdout).optString("result") == "supported" }.getOrDefault(false)
         notice = "已连接 MagicNet 模块。"
         status()
     }
@@ -56,7 +57,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
                 phase = when {
                     process == "stopped" -> "idle"
                     process != "running" -> "unknown"
-                    data.optJSONObject("readiness")?.optBoolean("overall", false) == true -> "ready"
+                    data.optJSONObject("readiness")?.opt("overall") == true -> "ready"
                     else -> "error"
                 }
                 notice = when (phase) {
@@ -81,12 +82,13 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         lastNodeRead = System.currentTimeMillis()
         val config = root.run("cat '/data/adb/modules/MagicNet/.config/sing-box/config.json'")
         if (!config.success) { nodes = JSONArray(); selected = ""; return }
-        val doc = runCatching { JSONObject(config.stdout) }.getOrNull() ?: return
+        val doc = runCatching { cloudJson(config.stdout) }.getOrNull()
+        if (doc == null) { nodes = JSONArray(); selected = ""; return }
         nodes = JSONArray(nodeChoices(doc).take(5000).map { JSONObject().put("tag", it.optString("tag")).put("type", it.optString("type")) })
         if (running) {
             val result = command("api proxies", seconds = 8)
-            val proxy = runCatching { JSONObject(result.stdout).optJSONObject("proxies")?.optJSONObject("proxy") }.getOrNull()
-            selected = proxy?.optString("now").orEmpty()
+            val proxy = runCatching { cloudJson(result.stdout).optJSONObject("proxies")?.optJSONObject("proxy") }.getOrNull()
+            selected = if (result.success) proxy?.optString("now").orEmpty() else ""
         } else { selected = "" }
     }
     override fun start() {
@@ -96,7 +98,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         requireCloud(root.run("test ! -e /sys/class/net/magicnet0").success, "检测到其他透明代理，请先停止通用版或其他代理应用。")
         write("service start sing-box")
         val after = data("--json service status", "service.status")
-        requireCloud(after.optJSONObject("readiness")?.optBoolean("overall", false) == true,
+        requireCloud(after.optJSONObject("readiness")?.opt("overall") == true,
             "启动命令已执行，但模块尚未报告完整就绪；请查看诊断，不会显示连接成功。")
     }
     override fun stop() {
@@ -140,6 +142,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         requireCloud(selected == tag, "模块未确认节点切换，未更新界面中的已选节点。")
     }
     override fun diagnose(): String {
+        requireCloud(selected.isNotBlank(), "请先选择模块中的当前节点。")
         val result = command("node test ${shellQuote(selected)}", seconds = 25)
         requireCloud(selected.isNotBlank() && result.success, "当前节点验证失败；请在高级管理中查看模块诊断。")
         return "当前节点已通过 MagicNet 的实际延迟测试。"

@@ -89,7 +89,7 @@ internal fun makeCoreConfig(document: JSONObject, mode: String, selected: String
     return JSONObject().put("log", JSONObject().put("level", "warn").put("timestamp", false))
         .put("inbounds", inbounds).put("outbounds", outbounds).put("endpoints", document.optJSONArray("endpoints") ?: JSONArray())
         .put("dns", JSONObject().put("servers", JSONArray().put(JSONObject().put("type", "udp").put("server", "1.1.1.1").put("tag", CLOUD_DNS))))
-        .put("route", JSONObject().put("auto_detect_interface", true).put("default_domain_resolver", CLOUD_DNS)
+        .put("route", JSONObject().put("auto_detect_interface", mode != "system").put("default_domain_resolver", CLOUD_DNS)
             .put("rules", JSONArray().put(JSONObject().put("protocol", "dns").put("action", "hijack-dns"))).put("final", CLOUD_SELECTOR))
         .put("experimental", JSONObject().put("clash_api", JSONObject().put("external_controller", "127.0.0.1:$CLOUD_API_PORT").put("secret", secret)))
 }

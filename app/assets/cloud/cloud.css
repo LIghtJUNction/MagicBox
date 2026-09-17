@@ -4,3 +4,6 @@
 @media(min-width:600px){.app{padding:0 44px 116px}.topbar{height:110px}.cloud-stage{height:275px}#cloud{height:247px}.eyebrow{margin-top:26px}.bottom-nav{padding-left:44px;padding-right:44px}.mode{padding:17px;min-height:121px}}
 @media(max-width:359px){.app{padding-left:20px;padding-right:20px}h1{font-size:48px}.chapter{font-size:7px}.mode-grid{gap:6px}.mode{padding:12px 8px}.mode-detail{font-size:8px}.cloud-stage{height:214px}#cloud{height:193px}.connect-button{min-height:58px}.mode-section{margin-top:22px}.bottom-nav{padding-left:20px;padding-right:20px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}:root[data-reduced=true] *, :root[data-reduced=true] *:before{animation:none!important;transition:none!important}
+
+/* Horizontal dissolution preserves normal vertical page scrolling and zoom. */
+[data-token]{touch-action:pan-y pinch-zoom}

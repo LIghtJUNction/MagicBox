@@ -1,237 +1,96 @@
 name: Release
-
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
-      bump:
-        description: "Version bump when version is empty"
+      validated_run:
+        description: Successful Token Cloud push-run ID
         required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      version:
-        description: "Optional exact version, for example 0.2.0 or v0.2.0"
-        required: false
         type: string
-      prerelease:
-        description: "Mark as prerelease"
+      reviewed_sha:
+        description: Exact 40-character commit reviewed with its device screenshots
         required: true
-        default: false
-        type: boolean
-
+        type: string
+      tag:
+        description: Alpha version already embedded in the verified APKs
+        default: v0.2.0-alpha.1
+        required: true
+        type: string
 permissions:
   contents: write
-
+  actions: read
+concurrency:
+  group: magicbox-release
+  cancel-in-progress: false
 jobs:
-  release:
-    name: Bump, build, and publish APKs
+  publish:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.validated_run }}
+      REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+      RELEASE_TAG: ${{ inputs.tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          token: ${{ github.token }}
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
-
-      - name: Decode release signing key
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ref: ${{ inputs.reviewed_sha }}
+      - name: Verify immutable validation run
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${ANDROID_KEYSTORE_BASE64}" ]]; then
-            echo "ANDROID_KEYSTORE_BASE64 is not set; release APK will be unsigned."
-            exit 0
-          fi
-
-          keystore="${RUNNER_TEMP}/magicbox-release.jks"
-          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${keystore}"
-          echo "ANDROID_KEYSTORE_FILE=${keystore}" >> "${GITHUB_ENV}"
-
-      - name: Resolve release version
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
-          INPUT_VERSION: ${{ github.event.inputs.version || '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          read_prop() {
-            sed -n "s/^$1=//p" gradle.properties | head -n 1
-          }
-
-          validate_version() {
-            local value="$1"
-            if [[ ! "${value}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Version must look like 0.1.0" >&2
-              exit 1
-            fi
-          }
-
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            tag="${GITHUB_REF_NAME}"
-            if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Tag must look like v0.1.0" >&2
-              exit 1
-            fi
-            version="${tag#v}"
-            version_code="$(read_prop project.version.code)"
-            target="${GITHUB_SHA}"
-          else
-            git fetch --tags --force
-
-            requested="${INPUT_VERSION#v}"
-            if [[ -n "${requested}" ]]; then
-              version="${requested}"
-              validate_version "${version}"
-            else
-              latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1 || true)"
-              if [[ -n "${latest_tag}" ]]; then
-                base="${latest_tag#v}"
-              else
-                base="$(read_prop project.version.name)"
-              fi
-              validate_version "${base}"
-
-              IFS='.' read -r major minor patch_extra <<< "${base}"
-              patch="${patch_extra%%[-+]*}"
-              case "${INPUT_BUMP}" in
-                major)
-                  major=$((major + 1))
-                  minor=0
-                  patch=0
-                  ;;
-                minor)
-                  minor=$((minor + 1))
-                  patch=0
-                  ;;
-                patch)
-                  patch=$((patch + 1))
-                  ;;
-                *)
-                  echo "Unsupported bump: ${INPUT_BUMP}" >&2
-                  exit 1
-                  ;;
-              esac
-              version="${major}.${minor}.${patch}"
-            fi
-
-            tag="v${version}"
-            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
-              echo "Tag already exists: ${tag}" >&2
-              exit 1
-            fi
-
-            current_code="$(read_prop project.version.code)"
-            version_code=$((current_code + 1))
-
-            sed -i \
-              -e "s/^project.version.name=.*/project.version.name=${version}/" \
-              -e "s/^project.version.code=.*/project.version.code=${version_code}/" \
-              gradle.properties
-
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add gradle.properties
-            git commit -m "Release ${tag}"
-            target="$(git rev-parse HEAD)"
-            branch="${GITHUB_REF_NAME}"
-          fi
-
-          {
-            echo "tag=${tag}"
-            echo "version=${version}"
-            echo "version_code=${version_code}"
-            echo "target=${target}"
-            echo "branch=${branch:-}"
-          } >> "${GITHUB_OUTPUT}"
-
-      - name: Build APKs
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assemble --stacktrace
-
-      - name: Push version bump
-        if: github.event_name == 'workflow_dispatch'
-        run: git push origin "HEAD:${{ steps.release.outputs.branch }}"
-
-      - name: Prepare artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s globstar nullglob
-
-          mkdir -p release
-          apks=(app/build/outputs/apk/**/*.apk)
-          if (( ${#apks[@]} == 0 )); then
-            echo "No APKs were produced" >&2
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
+          python3 - <<'PY'
+          import json, os
+          run=json.load(open('run.json'))
+          assert run['conclusion']=='success' and run['status']=='completed'
+          assert run['head_sha']==os.environ['REVIEWED_SHA']
+          assert run['event']=='push' and run['path']=='.github/workflows/token-cloud.yml'
+          assert run['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert run['head_branch'] in ('main','codex/token-cloud-reboot')
+          PY
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite tested artifacts.' >&2
             exit 1
           fi
-
-          for apk in "${apks[@]}"; do
-            name="$(basename "${apk}")"
-            variant="${name#app-}"
-            variant="${variant%.apk}"
-            cp "${apk}" "release/MagicBox-${{ steps.release.outputs.tag }}-${{ steps.release.outputs.version_code }}-${variant}.apk"
-          done
-          ls -lh release
-
-      - name: Create or update GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease || 'false' }}
+      - name: Download only the selected run artifacts
+        run: |
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-validation --dir validated
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-device-evidence --dir device
+      - name: Check exact bytes and prepare both editions
+        run: |
+          python3 scripts/test-prepare-alpha.py
+          python3 scripts/prepare-alpha.py --sha "$REVIEWED_SHA" --tag "$RELEASE_TAG"
+      - name: Include pinned dependency sources and validation evidence
         shell: bash
         run: |
           set -euo pipefail
-          args=()
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${INPUT_PRERELEASE}" == "true" ]]; then
-            args+=(--prerelease)
-          fi
+          mkdir dependencies-source
+          revision=a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
+          gh api "repos/LIghtJUNction/MagicNet/zipball/$revision" > dependencies-source/MagicNet.zip
+          core=$(gh api "repos/LIghtJUNction/MagicNet/contents/sing-box?ref=$revision" --jq .sha)
+          [[ "$core" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/LIghtJUNction/sing-box/zipball/$core" > dependencies-source/sing-box.zip
+          gh api repos/Fanju6/Proxylink/zipball/44929c0984944870297c260dc43a4aa9262f9e1c > dependencies-source/Proxylink.zip
+          tar -czf "release/MagicBox-$RELEASE_TAG-dependencies-source.tar.gz" dependencies-source
+          tar -czf "release/MagicBox-$RELEASE_TAG-device-evidence.tar.gz" device
+          (cd release && sha256sum * > SHA256SUMS)
+      - name: Publish Alpha, never unsigned or untested builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'NOTES'
+          MagicBox Token Cloud Alpha — two co-installable test editions.
 
-          notes="$(cat <<NOTES
-          MagicBox Android frontend APK for the MagicNet Magisk module backend.
+          Universal: com.github.lightjunction.magicbox — bundled sing-box, converter and supervised runtime; arm64-v8a + x86_64.
+          UI: com.github.lightjunction.magicbox.ui — root + an enabled compatible MagicNet module are mandatory. No proxy core is bundled.
 
-          Version: ${{ steps.release.outputs.version }}
-          Version code: ${{ steps.release.outputs.version_code }}
+          These are the exact signed test APKs from the successful Android 35 emulator validation. UI screenshots, socket proxy transfer, stop behavior, failed-import retention and package isolation are included in the evidence archive. CI test signing is not the future stable release key; a later differently signed test build may require uninstalling the older test build first.
+
+          System proxy provides HTTP/SOCKS on 127.0.0.1:2080; configure Wi-Fi or supported apps manually. It is not a VPN. Rooted physical-device TUN/eBPF, network switching and sleep recovery remain experimental and have not been certified by emulator tests. Subscription formats are explicitly enumerated in README; unknown extensions fail rather than being silently dropped.
           NOTES
-          )"
-
-          if gh release view "${{ steps.release.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${{ steps.release.outputs.tag }}" release/*.apk \
-              --repo "${GITHUB_REPOSITORY}" \
-              --clobber
-          else
-            gh release create "${{ steps.release.outputs.tag }}" \
-              release/*.apk \
-              --repo "${GITHUB_REPOSITORY}" \
-              --target "${{ steps.release.outputs.target }}" \
-              --title "MagicBox ${{ steps.release.outputs.tag }}" \
-              --notes "${notes}" \
-              "${args[@]}"
-          fi
+          printf '\nValidated commit: %s\nValidation run: https://github.com/%s/actions/runs/%s\n' "$REVIEWED_SHA" "$GITHUB_REPOSITORY" "$RUN_ID" >> notes.md
+          gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --target "$REVIEWED_SHA" --title "MagicBox $RELEASE_TAG · Token Cloud" --notes-file notes.md --prerelease --latest=false --draft
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
