@@ -1,0 +1,21 @@
+{
+  "validated_run": 35196386148,
+  "reviewed_sha": "f882d7b9fa6fd2d2eda497656289456d9f10b216",
+  "head_sha": "dadd3463749f7b04a212916c30b743ae0a03a537",
+  "tag": "v0.2.0-alpha.1",
+  "visually_reviewed": true,
+  "screenshots": [
+    {"edition":"universal","file":"qa-home-light.png","sha256":"9afc85deff77d2e43622e052971dc3aa3ecaa10531ef4d865ec6da6aad3e969e"},
+    {"edition":"universal","file":"qa-subscriptions-light.png","sha256":"cc6d1315853e2c07957107db296fb3eb3beeaa9550008c0af6a6a49103d286b6"},
+    {"edition":"universal","file":"qa-settings-light.png","sha256":"7d1818b5b37535c8aa25a1fe38a00505900545b14800e0f8462441de689c8a9d"},
+    {"edition":"universal","file":"qa-home-dark.png","sha256":"d782f75bd37e05f5e5c37a554294e4f8dd198d1659aa1ed19f3e5f03c98aaf34"},
+    {"edition":"universal","file":"qa-subscriptions-dark.png","sha256":"57d724ef62043356105027658b57f12b0356a8fdd7750d5f78f345f23867be95"},
+    {"edition":"universal","file":"qa-settings-dark.png","sha256":"51e4588395e914ad5640232160af84a8799340cf9dd7af476d7b0716a2afb818"},
+    {"edition":"ui","file":"qa-home-light.png","sha256":"7e2fa7e93d8eba69153ec5207467e989c9088e59f0f5a0e80d331d6d1f853bae"},
+    {"edition":"ui","file":"qa-subscriptions-light.png","sha256":"6a73bbbf7a040c78d6576900ee8d11ebd5ec64a7950db09e34a4f7b37f797cac"},
+    {"edition":"ui","file":"qa-settings-light.png","sha256":"f510b3822f10f8bf729d6f8b40499d679ada225a7200ff29e45e7697021d8979"},
+    {"edition":"ui","file":"qa-home-dark.png","sha256":"474076b6a3384952436db0011ce0ae32e839f0641eb4bbb03ef017cc45adadfc"},
+    {"edition":"ui","file":"qa-subscriptions-dark.png","sha256":"c3865dd6e9bbf2a601c5c223ae4faafbf1b88e9bf009ab0735ea3daddd0d65f1"},
+    {"edition":"ui","file":"qa-settings-dark.png","sha256":"3595c48601ed24a716f166a6aba94fc71b52d104c9e2efdf03faccfb4a1040a4"}
+  ]
+}
