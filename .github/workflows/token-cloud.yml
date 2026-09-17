@@ -1,0 +1,164 @@
+name: Token Cloud
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: token-cloud-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: LIghtJUNction/MagicNet
+          ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
+          path: dependencies/MagicNet
+          persist-credentials: false
+      - run: git -C dependencies/MagicNet submodule update --init --recursive sing-box
+      - uses: actions/checkout@v4
+        with:
+          repository: Fanju6/Proxylink
+          ref: 44929c0984944870297c260dc43a4aa9262f9e1c
+          path: dependencies/Proxylink
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dependencies/MagicNet/sing-box/go.mod
+          cache-dependency-path: |
+            dependencies/MagicNet/sing-box/go.sum
+            dependencies/Proxylink/Proxylink/go.sum
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: native-output
+          key: magicbox-native-v1-a94682e4-44929c09
+      - name: Build exact shared core
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p native-output/arm64-v8a native-output/x86_64 native-output/licenses
+          bash dependencies/MagicNet/scripts/build-sing-box.sh android arm64 "$PWD/native-output/arm64-v8a/libsingbox.so"
+          bash dependencies/MagicNet/scripts/build-sing-box.sh android amd64 "$PWD/native-output/x86_64/libsingbox.so"
+      - name: Test and build shared runtime adapters
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-output/licenses evidence
+          mkdir -p dependencies/Proxylink/Proxylink/cmd/magicbox
+          cp native/importer/*.go dependencies/Proxylink/Proxylink/cmd/magicbox/
+          (cd dependencies/Proxylink/Proxylink && go test -json ./cmd/magicbox) | tee evidence/importer-tests.json
+          cargo test --manifest-path native/runtime/Cargo.toml 2>&1 | tee evidence/runtime-tests.txt
+          rustup target add aarch64-linux-android x86_64-linux-android
+          ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+          if [[ -z "$ndk" ]]; then ndk=$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1); fi
+          toolchain="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$toolchain/aarch64-linux-android26-clang"
+          for entry in arm64-v8a:arm64:aarch64-linux-android x86_64:amd64:x86_64-linux-android; do
+            IFS=: read -r abi arch target <<< "$entry"
+            cc="$toolchain/${target}26-clang"
+            (cd dependencies/Proxylink/Proxylink && CGO_ENABLED=1 GOOS=android GOARCH="$arch" CC="$cc" go build -mod=readonly -trimpath -buildmode=pie -ldflags='-s -w -buildid=' -o "$GITHUB_WORKSPACE/native-output/$abi/libproxylink.so" ./cmd/magicbox)
+            export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$toolchain/aarch64-linux-android26-clang"
+            export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$toolchain/x86_64-linux-android26-clang"
+            RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384' cargo build --release --manifest-path native/runtime/Cargo.toml --target "$target"
+            cp "native/runtime/target/$target/release/magicbox-runtime" "native-output/$abi/libmbprobe.so"
+          done
+          cp dependencies/MagicNet/LICENSE native-output/licenses/MagicNet.txt
+          cp dependencies/MagicNet/sing-box/LICENSE native-output/licenses/sing-box.txt
+          cp dependencies/Proxylink/LICENSE native-output/licenses/Proxylink.txt
+          cp LICENSE native-output/licenses/MagicBox.txt
+          git -C dependencies/MagicNet/sing-box rev-parse HEAD > native-output/sing-box.commit
+          printf 'MagicNet=a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd\nProxylink=44929c0984944870297c260dc43a4aa9262f9e1c\nMagicBox=%s\n' "$GITHUB_SHA" > native-output/provenance.txt
+          (cd native-output && sha256sum */*.so > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-native-components
+          path: native-output/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-evidence
+          path: |
+            evidence/
+            native/runtime/Cargo.lock
+  validate:
+    needs: native
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-native-components
+          path: native-output
+      - name: Stage universal-only components
+        run: |
+          mkdir -p app/universal/jniLibs app/universal/assets/components
+          cp -R native-output/arm64-v8a native-output/x86_64 app/universal/jniLibs/
+          cp -R native-output/licenses native-output/provenance.txt native-output/SHA256SUMS app/universal/assets/components/
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test both editions and build installable test APKs
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testUniversalDebugUnitTest :app:testUiDebugUnitTest :app:assembleUniversalDebug :app:assembleUiDebug :app:assembleUniversalDebugAndroidTest :app:assembleUiDebugAndroidTest --stacktrace
+      - name: Verify packages, signatures and component isolation
+        run: python3 scripts/verify-apks.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-validation
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/reports/tests/
+            app/build/test-results/
+            evidence/
+          if-no-files-found: error
+  device:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-validation
+          path: validated
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/device-acceptance.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-device-evidence
+          path: evidence/device/
+          if-no-files-found: error
