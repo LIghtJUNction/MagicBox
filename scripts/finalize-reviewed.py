@@ -1,7 +1,8 @@
-"""Finish the already-uploaded approved draft; never recreate or overwrite assets.
+"""Finish the approved publication by explicit ID, or accept an identical one.
 
-GitHub's release-by-tag endpoint only returns published releases. Drafts must
-be verified and published by their explicit numeric release ID.
+The release-by-tag API excludes drafts. Never rebuild, replace assets, delete a
+published release, or delete a tag. Only this attempt's own redundant draft may
+be removed after its full output is backed up and the published APKs match.
 """
 import importlib.util
 import json
@@ -12,8 +13,6 @@ import re
 spec = importlib.util.spec_from_file_location('publisher', Path(__file__).with_name('publish-reviewed.py'))
 pub = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pub)
-
-# These IDs identify this publication attempt, not an arbitrary draft/tag.
 RELEASE_ID = 390526680
 OUTPUT_RUN = 35197318445
 OUTPUT_COMMIT = '145a920993907a715df600285b74002c3f99d459'
@@ -46,9 +45,11 @@ def main():
         pub.require(name not in checked and pub.digest(output / name) == expected, 'Publication bytes changed')
         checked.add(name)
     pub.require(checked == {p.name for p in output.iterdir() if p.is_file()} - {'SHA256SUMS'}, 'Incomplete checksum inventory')
+    critical = [output / f"MagicBox-{approval['tag']}-source.zip"]
     for row in rows:
         path = output / f"MagicBox-{approval['tag']}-{row['edition']}-test.apk"
         pub.require(pub.digest(path) == row['sha256'] and path.stat().st_size == row['bytes'], 'Publication APK differs from tested APK')
+        critical.append(path)
     release = pub.api(f'releases/{RELEASE_ID}')
     pub.require(release['tag_name'] == approval['tag'] and release['target_commitish'] == approval['source_sha'], 'Wrong release identity')
     pub.require(release['prerelease'] is True, 'Stable publication was not approved')
@@ -58,9 +59,23 @@ def main():
         asset = remote[path.name]
         pub.require(asset['digest'] == 'sha256:' + pub.digest(path) and asset['size'] == path.stat().st_size, 'Uploaded asset changed')
     if release['draft']:
-        # Never select a second concurrent draft using an ambiguous tag name.
         published = [r for r in pub.api('releases?per_page=100') if r['tag_name'] == approval['tag'] and not r['draft']]
-        pub.require(not published, 'Another release is already published; inspect it instead of overwriting')
+        if published:
+            pub.require(len(published) == 1, 'Ambiguous published releases')
+            existing = published[0]
+            pub.require(existing['id'] != RELEASE_ID and existing['prerelease'] is True and existing['target_commitish'] == approval['source_sha'], 'Different release already published')
+            existing_assets = {a['name']: a for a in existing['assets']}
+            for path in critical:
+                asset = existing_assets.get(path.name, {})
+                pub.require(asset.get('digest') == 'sha256:' + pub.digest(path) and asset.get('size') == path.stat().st_size, 'Published APK/source differs from inspected bytes')
+            # All own draft assets have just been verified against OUTPUT_RUN's
+            # immutable backup. Remove only the temporary draft this attempt made.
+            current = pub.api(f'releases/{RELEASE_ID}')
+            pub.require(current['draft'] is True and current['target_commitish'] == approval['source_sha'], 'Draft changed during verification')
+            pub.gh('api', '--method', 'DELETE', f'repos/{pub.REPO}/releases/{RELEASE_ID}')
+            print('Identical reviewed Alpha already published:', existing['html_url'])
+            print('Removed only this attempt\'s backed-up duplicate draft:', RELEASE_ID)
+            return
         pub.gh('api', '--method', 'PATCH', f'repos/{pub.REPO}/releases/{RELEASE_ID}',
                '-F', 'draft=false', '-F', 'prerelease=true', '-f', 'make_latest=false')
     result = pub.api(f'releases/{RELEASE_ID}')
