@@ -84,15 +84,29 @@ class CloudInteractionTest {
             val x = left + width * .4f; val y = top + (dimensions.getDouble("y") * scale).toFloat()
             val downTime = SystemClock.uptimeMillis()
             fun touch(action: Int, nextX: Float) {
-                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, nextX, y, 0)
-                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                val properties = MotionEvent.PointerProperties().apply {
+                    id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER
+                }
+                val coordinates = MotionEvent.PointerCoords().apply {
+                    this.x = nextX; this.y = y
+                    pressure = if (action == MotionEvent.ACTION_UP) 0f else 1f
+                    size = 1f
+                }
+                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                    1, arrayOf(properties), arrayOf(coordinates), 0, 0, 1f, 1f,
+                    0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
                 try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) } finally { event.recycle() }
             }
             touch(MotionEvent.ACTION_DOWN, x)
             try {
                 for (step in 1..8) { Thread.sleep(35); touch(MotionEvent.ACTION_MOVE, x + (step * 8 * scale).toFloat()) }
-                Thread.sleep(120)
+                // Hold longer than a complete recovery animation. Implicit capture
+                // transfer from canvas to stage must not be treated as finger-up.
+                Thread.sleep(900)
                 assertTrue("Drag did not activate token particles", js(scenario, "CloudUI.metrics().active").toInt() > 0)
+                val heldFrames = js(scenario, "CloudUI.metrics().frames")
+                Thread.sleep(350)
+                assertEquals("A stationary held gesture should not repaint", heldFrames, js(scenario, "CloudUI.metrics().frames"))
                 screenshot("token-drag-real-touch")
             } finally { touch(MotionEvent.ACTION_UP, x + (64 * scale).toFloat()) }
             Thread.sleep(900)

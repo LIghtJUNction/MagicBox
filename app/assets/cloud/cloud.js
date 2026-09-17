@@ -146,16 +146,29 @@
   if(gesture?.active){suppressedClick={target:gesture.target,time:performance.now()};particles.release();}
   gesture=null;
  }
- document.addEventListener('pointerup',finishGesture);
- document.addEventListener('pointercancel',()=>{gesture=null;particles.cancel();});
- document.addEventListener('lostpointercapture',finishGesture);
+ document.addEventListener('pointerup',event=>{
+  if(gesture?.id===event.pointerId)finishGesture();
+ });
+ document.addEventListener('pointercancel',event=>{
+  if(gesture?.id!==event.pointerId)return;
+  gesture=null;particles.cancel();
+ });
+ document.addEventListener('lostpointercapture',event=>{
+  // Touch implicitly captures the canvas/label first. Transferring that
+  // capture to our control emits a bubbling loss from the child; it is NOT
+  // a release. Only loss from our explicit owner ends this gesture.
+  if(gesture?.id===event.pointerId&&event.target===gesture.target)finishGesture();
+ });
+ const eligibleClicks=new WeakSet();
  document.addEventListener('click',event=>{
   if(suppressedClick&&performance.now()-suppressedClick.time<800&&suppressedClick.target.contains(event.target)){
-   event.preventDefault();event.stopImmediatePropagation();suppressedClick=null;
+   event.preventDefault();event.stopImmediatePropagation();suppressedClick=null;return;
   }
+  const button=event.target.closest('[data-token]');
+  if(button&&!button.disabled)eligibleClicks.add(event);
  },true);
  // Run after theme/navigation handlers so they cannot cancel the just-created effect.
- document.addEventListener('click',event=>{const button=event.target.closest('[data-token]');if(button&&!button.disabled)particles.burst(button);});
+ document.addEventListener('click',event=>{const button=event.target.closest('[data-token]');if(button&&eligibleClicks.has(event))particles.burst(button);});
  $('appearance').addEventListener('click',()=>{theme=theme==='light'?'dark':'light';applyTheme();});$('reduce-motion').addEventListener('click',()=>{reduced=!reduced;store.set('cloud.reduce',String(reduced));applyMotion();});systemMotion.addEventListener?.('change',applyMotion);darkMedia.addEventListener?.('change',event=>{if(!store.get('cloud.theme')){theme=event.matches?'dark':'light';applyTheme();}});
  document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>navigate(el.dataset.page)));
  $('choose-node').addEventListener('click',()=>navigate('subscriptions'));
