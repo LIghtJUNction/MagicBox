@@ -1,7 +1,7 @@
 name: Token Cloud
 on:
   push:
-    branches: [main, codex/token-cloud-reboot]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:

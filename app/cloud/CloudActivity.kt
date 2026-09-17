@@ -91,7 +91,7 @@ class CloudActivity : ComponentActivity() {
     private inner class Bridge {
         @JavascriptInterface fun request(id: String, action: String, payload: String) {
             if (!id.matches(Regex("[0-9]{1,12}")) || payload.length > CLOUD_INPUT_LIMIT + 4096) return
-            val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: return
+            val parsed = runCatching { cloudJson(payload) }.getOrNull() ?: return
             if (action in setOf("file", "about", "advanced", "appearance")) {
                 runOnUiThread {
                     if (!alive || isFinishing) return@runOnUiThread

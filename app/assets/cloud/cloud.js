@@ -51,10 +51,57 @@
   $('node-count').textContent=String(state.nodeCount||0);
   renderNodes();updateBusy();applyMotion();
  }
- let nodesSignature='';
- function renderNodes(){const nodes=Array.isArray(state.nodes)?state.nodes:[];const signature=JSON.stringify([nodes,state.selected]);if(signature===nodesSignature)return;nodesSignature=signature;const list=$('node-list');list.replaceChildren();if(!nodes.length){const empty=document.createElement('div');empty.className='empty-state';const glyph=document.createElement('span');glyph.textContent='{ }';glyph.setAttribute('aria-hidden','true');const p=document.createElement('p');p.textContent=state.edition==='ui'?'节点由 MagicNet 模块管理。':'一切从一个连接开始。';const small=document.createElement('small');small.textContent=state.edition==='ui'?'可在高级管理中查看和选择。':'导入后，节点会出现在这里。';empty.append(glyph,p,small);list.append(empty);return;}
- const fragment=document.createDocumentFragment();nodes.slice(0,500).forEach((node,index)=>{const button=document.createElement('button');button.className='node-row'+(node.tag===state.selected?' selected':'');button.dataset.token='';button.setAttribute('aria-pressed',String(node.tag===state.selected));const glyph=document.createElement('span');glyph.className='node-symbol';glyph.textContent=String(index+1).padStart(2,'0');const copy=document.createElement('span');copy.className='node-copy';const title=document.createElement('strong');title.textContent=node.tag;const type=document.createElement('small');type.textContent=String(node.type||'proxy').toUpperCase();copy.append(title,type);const radio=document.createElement('span');radio.className='node-radio';radio.setAttribute('aria-hidden','true');button.append(glyph,copy,radio);button.addEventListener('click',()=>act('select',{tag:node.tag}));fragment.append(button);});list.append(fragment);
- if(nodes.length>500){const note=document.createElement('p');note.className='form-hint';note.textContent='已导入全部节点，界面仅展示前 500 项以保持流畅。';list.append(note);}}
+ const NODE_PAGE_SIZE = 100;
+ let nodesSignature = '', nodePage = 0, nodeQuery = '';
+ function renderNodes() {
+  const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+  const matched = nodeQuery ? nodes.filter(node => `${node.tag} ${node.type || ''}`.toLocaleLowerCase().includes(nodeQuery)) : nodes;
+  const pages = Math.max(1, Math.ceil(matched.length / NODE_PAGE_SIZE));
+  nodePage = Math.min(nodePage, pages - 1);
+  const start = nodePage * NODE_PAGE_SIZE;
+  const shown = matched.slice(start, start + NODE_PAGE_SIZE);
+  const signature = JSON.stringify([shown, state.selected, state.edition, nodePage, nodeQuery, matched.length]);
+  $('node-search').hidden = !nodes.length;
+  $('node-pagination').hidden = matched.length <= NODE_PAGE_SIZE;
+  $('node-page-label').textContent = `${nodePage + 1} / ${pages} · ${matched.length} 个节点`;
+  $('node-prev').disabled = nodePage === 0;
+  $('node-next').disabled = nodePage >= pages - 1;
+  if (signature === nodesSignature) return;
+  nodesSignature = signature;
+  const list = $('node-list');
+  list.replaceChildren();
+  if (!matched.length) {
+   const empty = document.createElement('div'); empty.className = 'empty-state';
+   const glyph = document.createElement('span'); glyph.textContent = '{ }'; glyph.setAttribute('aria-hidden', 'true');
+   const p = document.createElement('p');
+   p.textContent = nodeQuery ? '没有匹配的节点。' : state.edition === 'ui' ? '节点由 MagicNet 模块管理。' : '一切从一个连接开始。';
+   const small = document.createElement('small');
+   small.textContent = nodeQuery ? '试试节点名称或协议类型。' : state.edition === 'ui' ? '导入订阅或打开高级管理。' : '导入后，节点会出现在这里。';
+   empty.append(glyph, p, small); list.append(empty); return;
+  }
+  const fragment = document.createDocumentFragment();
+  shown.forEach((node, index) => {
+   const button = document.createElement('button');
+   button.className = 'node-row' + (node.tag === state.selected ? ' selected' : '');
+   button.dataset.token = ''; button.setAttribute('aria-pressed', String(node.tag === state.selected));
+   const glyph = document.createElement('span'); glyph.className = 'node-symbol'; glyph.textContent = String(start + index + 1).padStart(2, '0');
+   const copy = document.createElement('span'); copy.className = 'node-copy';
+   const title = document.createElement('strong'); title.textContent = node.tag;
+   const type = document.createElement('small'); type.textContent = String(node.type || 'proxy').toUpperCase();
+   copy.append(title, type);
+   const radio = document.createElement('span'); radio.className = 'node-radio'; radio.setAttribute('aria-hidden', 'true');
+   button.append(glyph, copy, radio); button.addEventListener('click', () => act('select', {tag: node.tag})); fragment.append(button);
+  });
+  list.append(fragment);
+ }
+ $('node-search').addEventListener('input', event => {
+  nodeQuery = event.target.value.trim().toLocaleLowerCase(); nodePage = 0; renderNodes();
+ });
+ for (const [id, step] of [['node-prev', -1], ['node-next', 1]]) {
+  $(id).addEventListener('click', () => {
+   nodePage += step; renderNodes(); $('node-search').scrollIntoView({block:'start'});
+  });
+ }
  function navigate(next){if(!['home','subscriptions','settings'].includes(next))return;particles.cancel();page=next;document.querySelectorAll('.page').forEach(el=>el.hidden=el.id!==`page-${next}`);document.querySelectorAll('[data-page]').forEach(el=>{el.classList.toggle('active',el.dataset.page===next);if(el.dataset.page===next)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});window.scrollTo(0,0);if(page==='home')drawCloud();}
  let restoreFocus=null;
  function dialog(title,text){particles.cancel();restoreFocus=document.activeElement;$('dialog-title').textContent=title;$('dialog-content').textContent=text;$('dialog-overlay').hidden=false;$('dialog-close').focus();}
@@ -84,8 +131,18 @@
  document.querySelectorAll('[data-mode]').forEach(el=>el.addEventListener('click',()=>{const mode=state.modes?.find(m=>m.id===el.dataset.mode);if(!mode?.available){toast(mode?.reason||'此模式暂不可用。');return;}act('mode',{mode:el.dataset.mode});}));
  $('mode-help').addEventListener('click',()=>dialog('三种方式，不混为一谈。','系统代理\n在本机提供 HTTP / SOCKS 服务。无 Root 时需在 Wi-Fi 或支持代理的应用里手动设置 127.0.0.1:2080；它不是全设备 VPN，部分应用会忽略系统代理。\n\nTUN\n需要 Root，通过虚拟网卡接管流量。启动前检查权限和其他代理，失败会保留错误状态。\n\neBPF\n需要 Root、支持 eBPF 的 sing-box 和设备内核。只有能力验证通过后才能使用，不会用 TUN 状态冒充 eBPF 成功。\n\nUI 版由 MagicNet 提供服务，只显示模块实际支持的模式。'));
  $('import-text').addEventListener('click',()=>{const text=$('subscription-input').value.trim();if(!text){toast('请先粘贴订阅链接或配置。');return;}act('import',{text});});$('import-file').addEventListener('click',()=>act('file'));$('refresh-sub').addEventListener('click',()=>act('refreshSubscription'));$('root').addEventListener('click',()=>act('authorize'));$('diagnose').addEventListener('click',()=>act('diagnose'));$('advanced').addEventListener('click',()=>act('advanced'));$('project').addEventListener('click',()=>act('about'));$('dialog-close').addEventListener('click',closeDialog);$('dialog-done').addEventListener('click',closeDialog);$('dialog-overlay').addEventListener('click',event=>{if(event.target===$('dialog-overlay'))closeDialog();});
- async function poll(){if(!native||document.hidden||paused||busy)return;schedulePoll(5000);try{render(await request('status'));}catch(_){render({phase:'unknown',message:'读取状态失败，请重新检查权限与组件。'});}}
- function schedulePoll(ms){clearTimeout(pollTimer);if(native&&!document.hidden&&!paused)pollTimer=setTimeout(poll,ms);}
+ let polling = false;
+ async function poll() {
+  if (!native || document.hidden || paused || busy || polling) return;
+  polling = true;
+  try { const next = await request('status'); if (!document.hidden && !paused) render(next); }
+  catch (_) { if (!document.hidden && !paused) render({phase:'unknown', message:'读取状态失败，请重新检查权限与组件。'}); }
+  finally { polling = false; schedulePoll(5000); }
+ }
+ function schedulePoll(ms) {
+  clearTimeout(pollTimer);
+  if (native && !document.hidden && !paused) pollTimer = setTimeout(poll, ms);
+ }
  document.addEventListener('visibilitychange',()=>{if(document.hidden){particles.cancel();clearTimeout(pollTimer);}else{drawCloud();schedulePoll(0);}});let resizeTimer=0;addEventListener('resize',()=>{particles.cancel();clearTimeout(resizeTimer);resizeTimer=setTimeout(drawCloud,90);});
  $('preview-note').hidden=native;applyTheme();render(state);schedulePoll(0);
 })();

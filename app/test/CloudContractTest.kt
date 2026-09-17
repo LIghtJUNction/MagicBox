@@ -7,7 +7,7 @@ class CloudContractTest {
     private fun rejects(block: () -> Unit) { try { block(); fail("expected rejection") } catch (_: CloudFailure) { } }
     @Test fun machineEnvelopeRequiresExactTypesAndOneObject() {
         assertNotNull(machineData("""{"schema":1,"ok":true,"command":"service.status","data":{}}""", "service.status"))
-        for (value in listOf("""{"schema":"1","ok":true,"command":"service.status","data":{}}""", """{"schema":1,"ok":false,"command":"service.status","data":{}}""", """{"schema":1,"ok":true,"command":"other","data":{}}""", "{}{}", "{} trailing", "[]")) rejects { machineData(value,"service.status") }
+        for (value in listOf("""{"schema":1.5,"ok":true,"command":"service.status","data":{}}""","""{"schema":"1","ok":true,"command":"service.status","data":{}}""", """{"schema":1,"ok":false,"command":"service.status","data":{}}""", """{"schema":1,"ok":true,"command":"other","data":{}}""", "{}{}", "{} trailing", "[]")) rejects { machineData(value,"service.status") }
     }
     @Test fun boundedJsonRejectsDepthBeforeRecursiveParsing() { rejects { cloudJson("{\"x\":".repeat(40)+"0"+"}".repeat(40)) }; rejects { cloudJson("{\"x\":1}//comment") } }
     @Test fun importedNodesCannotReadRootFiles() { rejects { safeNodeDocument(JSONObject(node.replace("\"server_port\":1080","\"server_port\":1080,\"tls\":{\"certificate_path\":\"/data/private\"}"))) } }

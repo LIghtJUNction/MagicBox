@@ -44,7 +44,9 @@
  <div class="button-row"><button class="primary-button" id="import-text" data-token>解析并导入 <span aria-hidden="true">↗</span></button><button class="secondary-button" id="import-file" data-token>选择文件</button></div>
  <p class="form-hint">在本机转换，不上传到第三方转换站。无法识别的内容会明确提示，不覆盖已有配置。</p>
  <div class="section-heading node-heading"><h2>可用节点 <span id="node-count" class="count">0</span></h2><button id="refresh-sub" class="text-button" data-token>更新订阅 ↻</button></div>
+ <input id="node-search" type="search" maxlength="200" autocomplete="off" placeholder="搜索节点或协议" aria-label="搜索节点或协议" hidden>
  <div id="node-list" class="node-list"><div class="empty-state"><span aria-hidden="true">{ }</span><p>一切从一个连接开始。</p><small>导入后，节点会出现在这里。</small></div></div>
+ <div id="node-pagination" class="node-pagination" role="group" aria-label="节点分页" hidden><button id="node-prev" class="secondary-button" data-token>上一页</button><span id="node-page-label" class="tiny-label" aria-live="polite"></span><button id="node-next" class="secondary-button" data-token>下一页</button></div>
 </section>
 <section id="page-settings" class="page" aria-labelledby="settings-title" hidden>
  <div class="eyebrow">MADE TO FEEL LIGHT</div><div class="hero-heading"><h1 id="settings-title">偏好<span class="period">。</span></h1><span class="chapter">03 / CONTROL</span></div>

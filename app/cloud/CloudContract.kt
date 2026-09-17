@@ -48,7 +48,7 @@ internal fun cloudJson(text: String): JSONObject {
 }
 internal fun machineData(text: String, command: String): JSONObject {
     val envelope = cloudJson(text)
-    requireCloud(envelope.opt("schema") is Number && envelope.optInt("schema", -1) == 1 &&
+    requireCloud(envelope.opt("schema") is Number && (envelope.opt("schema") as Number).toDouble() == 1.0 &&
         envelope.opt("ok") == true && envelope.optString("command") == command,
         "MagicNet 的机器接口不兼容或读取失败；不会使用旧状态冒充成功。")
     return envelope.optJSONObject("data") ?: throw CloudFailure("MagicNet 状态缺少数据。")

@@ -1,6 +1,10 @@
 package com.github.lightjunction.magicbox
 
 import android.graphics.Bitmap
+import android.view.MotionEvent
+import android.view.InputDevice
+import android.os.SystemClock
+import java.util.concurrent.atomic.AtomicReference
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -87,8 +91,29 @@ class CloudDeviceTest {
         assumeTrue(BuildConfig.STANDALONE)
         ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
             ready(scenario)
+            val diagnostics = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
+            // Fixed non-secret fixtures only; do not add raw runtime diagnostics to production UI.
+            val dir = context.applicationInfo.nativeLibraryDir
+            File(diagnostics, "components.txt").writeText(
+                listOf("libsingbox.so", "libproxylink.so", "libmbprobe.so").joinToString("\n") {
+                    val file = File(dir, it)
+                    "$it present=${file.isFile} executable=${file.canExecute()} bytes=${file.length()}"
+                }
+            )
+            val converted = boundedProcess(listOf(File(dir, "libproxylink.so").path),
+                "http://127.0.0.1:18080#Fixture".toByteArray(), seconds = 15)
+            File(diagnostics, "converter-fixture.txt").writeText(converted.toString())
+            if (converted.success) {
+                val document = safeNodeDocument(cloudJson(converted.stdout))
+                val candidate = File(context.cacheDir, "fixture-check.json")
+                candidate.writeText(makeCoreConfig(document, "system", "Fixture", "test-only", "/sys/fs/cgroup").toString())
+                val checked = boundedProcess(listOf(File(dir, "libsingbox.so").path, "check", "-c", candidate.path), seconds = 15)
+                File(diagnostics, "core-check-fixture.txt").writeText(checked.toString())
+                candidate.delete()
+            }
             ServerSocket(0).use { upstream ->
                 val serverDone = CountDownLatch(1)
+                val serverError = AtomicReference<Throwable?>(null)
                 thread(isDaemon = true, name = "fixture-upstream") {
                     try {
                         upstream.accept().use { socket ->
@@ -104,6 +129,8 @@ class CloudDeviceTest {
                             socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\nmagicbox-e2e".toByteArray())
                             socket.getOutputStream().flush()
                         }
+                    } catch (error: Throwable) {
+                        if (!upstream.isClosed) serverError.set(error)
                     } finally { serverDone.countDown() }
                 }
                 val imported = call("import",JSONObject().put("text","http://127.0.0.1:${upstream.localPort}#Fixture"))
@@ -119,6 +146,7 @@ class CloudDeviceTest {
                         assertTrue("Proxy failed to relay the fixture response", response.contains("magicbox-e2e"))
                     }
                     assertTrue(serverDone.await(5,TimeUnit.SECONDS))
+                    assertNull("Upstream fixture failed: ${serverError.get()}", serverError.get())
                     val rejected = call("import",JSONObject().put("text","unknown://not-supported"))
                     assertFalse(rejected.optBoolean("ok"))
                     assertTrue(call("status").getJSONObject("data").optBoolean("running"))
@@ -139,5 +167,62 @@ class CloudDeviceTest {
         assertEquals("blocked",status.getString("phase"))
         assertFalse(call("start").optBoolean("ok"))
         assertFalse(File(context.applicationInfo.nativeLibraryDir,"libsingbox.so").exists())
+    }
+    @Test fun nodePaginationAndSearchDoNotDropLaterNodes() {
+        ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
+            ready(scenario)
+            js(scenario, "CloudUI.suspend()")
+            try {
+                js(scenario, """CloudNative.update({nodes:Array.from({length:505},(_,i)=>({tag:'node-'+String(i+1).padStart(4,'0'),type:'socks'})),nodeCount:505,selected:''}); document.querySelector('[data-page=subscriptions]').click()""")
+                assertEquals("100", js(scenario, "document.querySelectorAll('.node-row').length"))
+                js(scenario, "for(let i=0;i<5;i++)document.getElementById('node-next').click()")
+                assertEquals("5", js(scenario, "document.querySelectorAll('.node-row').length"))
+                assertEquals("true", js(scenario, "document.getElementById('node-list').textContent.includes('node-0505')"))
+                js(scenario, "const search=document.getElementById('node-search');search.value='node-0505';search.dispatchEvent(new Event('input'))")
+                assertEquals("1", js(scenario, "document.querySelectorAll('.node-row').length"))
+                assertEquals("true", js(scenario, "document.getElementById('node-list').textContent.includes('node-0505')"))
+                js(scenario, "document.getElementById('node-search').value='';document.getElementById('node-search').dispatchEvent(new Event('input'));CloudNative.update({nodes:[{tag:'<img src=x onerror=alert(1)>',type:'socks'}],nodeCount:1})")
+                assertEquals("0", js(scenario, "document.querySelectorAll('#node-list img').length"))
+                assertEquals("true", js(scenario, "document.getElementById('node-list').textContent.includes('<img')"))
+            } finally { js(scenario, "CloudUI.resume()") }
+        }
+    }
+    @Test fun actualDragReassemblesAndReducedMotionStopsDrawing() {
+        ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
+            ready(scenario); Thread.sleep(500)
+            js(scenario, "document.querySelector('[data-page=home]').click(); if(document.getElementById('reduce-motion').getAttribute('aria-checked')==='true')document.getElementById('reduce-motion').click()")
+            var left = 0; var top = 0; var width = 0
+            scenario.onActivity { activity ->
+                val view = findWeb(activity.findViewById(android.R.id.content))!!
+                val position = IntArray(2); view.getLocationOnScreen(position)
+                left = position[0]; top = position[1]; width = view.width
+            }
+            val dimensions = JSONObject(js(scenario, "JSON.stringify({w:innerWidth,y:document.getElementById('cloud').getBoundingClientRect().top+90})").let { org.json.JSONTokener(it).nextValue() as String })
+            val scale = width / dimensions.getDouble("w")
+            val x = left + width * .4f; val y = top + (dimensions.getDouble("y") * scale).toFloat()
+            val downTime = SystemClock.uptimeMillis()
+            fun touch(action: Int, nextX: Float) {
+                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, nextX, y, 0)
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) } finally { event.recycle() }
+            }
+            touch(MotionEvent.ACTION_DOWN, x)
+            try {
+                for (step in 1..8) { Thread.sleep(35); touch(MotionEvent.ACTION_MOVE, x + (step * 8 * scale).toFloat()) }
+                Thread.sleep(120)
+                assertTrue("Drag did not activate token particles", js(scenario, "CloudUI.metrics().active").toInt() > 0)
+                screenshot("token-drag")
+            } finally { touch(MotionEvent.ACTION_UP, x + (64 * scale).toFloat()) }
+            Thread.sleep(900)
+            assertEquals("0", js(scenario, "CloudUI.metrics().active"))
+            assertEquals("0", js(scenario, "document.querySelectorAll('.is-dispersed').length"))
+            js(scenario, "document.getElementById('reduce-motion').click()")
+            val before = js(scenario, "CloudUI.metrics().frames")
+            js(scenario, "document.querySelector('[data-mode=tun]').click()")
+            Thread.sleep(800)
+            assertEquals(before, js(scenario, "CloudUI.metrics().frames"))
+            assertEquals("0", js(scenario, "CloudUI.metrics().active"))
+            js(scenario, "document.getElementById('reduce-motion').click()")
+        }
     }
 }
