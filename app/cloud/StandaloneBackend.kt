@@ -28,7 +28,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
     private var child: Process? = null
     private var corePid = 0
     private var phase = "idle"
-    private var message = "添加订阅，选择自己的连接方式。"
+    private var message = ""
     private var secret = ""
     private var cgroup = "/sys/fs/cgroup"
     private var ebpf = false
@@ -47,7 +47,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
             if (root.run("test -f ${shellQuote("$candidate/cgroup.controllers")}").success) { cgroup = candidate; break }
         }
         ebpf = probeEbpf()
-        message = "Root 已授权；TUN 与 eBPF 按实际能力开放。"
+        message = "Root 已授权"
     }
 
     private fun probeEbpf(): Boolean {
@@ -75,7 +75,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         }
         val doc = profile.optJSONObject("nodes")
         val choices = doc?.let { runCatching { nodeChoices(it) }.getOrDefault(emptyList()) } ?: emptyList()
-        val result = baseState(context, root.authorized, currentMode)
+        return baseState(context, root.authorized, currentMode)
             .put("phase", if (!componentsReady()) "blocked" else phase)
             .put("running", child != null)
             .put("message", if (!componentsReady()) "此 APK 缺少当前架构的完整组件，不能启动代理。" else message)
@@ -84,15 +84,32 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
             .put("modes", JSONArray().put(modeEntry("system", componentsReady()))
                 .put(modeEntry("tun", root.authorized && tun, "需要 Root 和可用的 TUN 设备；请先申请权限。"))
                 .put(modeEntry("ebpf", ebpf, "需要 Root、支持 eBPF 的内核和可验证的设备能力。")))
-        return result
     }
 
     override fun mode(value: String) {
         requireCloud(child == null, "请先断开，再切换连接方式。")
         requireCloud(value == "system" || value == "tun" && root.authorized && tun || value == "ebpf" && ebpf,
             "当前设备尚未通过此模式的能力检查。")
-        val next = JSONObject(profile.toString()).put("mode", value)
-        commit(next); message = "连接方式已设为 ${if (value == "system") "系统代理" else value.uppercase()}。"
+        commit(JSONObject(profile.toString()).put("mode", value))
+        message = if (value == "system") "系统代理" else value.uppercase()
+    }
+
+    private fun convertRemote(source: String): ProcessResult {
+        var lastFetchError: CloudFailure? = null
+        var lastConversion: ProcessResult? = null
+        for (userAgent in SUBSCRIPTION_USER_AGENTS) {
+            val bytes = try {
+                downloadSubscription(source, userAgent)
+            } catch (error: CloudFailure) {
+                lastFetchError = error
+                continue
+            }
+            val converted = boundedProcess(listOf(converter.path), bytes, seconds = 10)
+            if (converted.success) return converted
+            lastConversion = converted
+        }
+        if (lastConversion != null) return lastConversion
+        throw lastFetchError ?: CloudFailure("无法获取订阅。原配置未变。")
     }
 
     override fun importText(value: String) {
@@ -100,16 +117,17 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         requireCloud(componentsReady(), "内置组件不完整，无法转换订阅。")
         val input = validateInput(value)
         val source = value.trim().takeIf { it.startsWith("https://") && !it.contains('\n') }.orEmpty()
-        val bytes = if (source.isNotEmpty()) downloadSubscription(source) else input
-        val converted = boundedProcess(listOf(converter.path), bytes, seconds = 30)
-        requireCloud(converted.success, "订阅未能完整转换，已保留原配置。请检查格式或不受支持的节点。")
-        val document = safeNodeDocument(cloudJson(converted.stdout))
+        val converted = if (source.isNotEmpty()) convertRemote(source)
+            else boundedProcess(listOf(converter.path), input, seconds = 15)
+        requireCloud(converted.success, "无法解析此订阅。原配置未变。")
+        val rawDocument = cloudJson(converted.stdout)
+        val skipped = rawDocument.optJSONObject("_magicbox")?.optInt("skipped", 0) ?: 0
+        val document = safeNodeDocument(rawDocument)
         val choices = nodeChoices(document)
         val chosen = selected.takeIf { old -> choices.any { it.optString("tag") == old } } ?: choices.first().getString("tag")
-        // Validate without privileged inbounds before committing the canonical profile.
         checkConfig(makeCoreConfig(document, "system", chosen, UUID.randomUUID().toString(), cgroup), privileged = false)
         commit(JSONObject(profile.toString()).put("nodes", document).put("selected", chosen).put("source", source))
-        message = "已导入 ${choices.size} 个节点。只导入节点，不继承订阅中的路由与监听设置。"
+        message = if (skipped > 0) "已导入 ${choices.size} · ${skipped} 未兼容" else "已导入 ${choices.size} 个节点"
     }
 
     override fun refresh() {
@@ -123,7 +141,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         val nodes = profile.optJSONObject("nodes") ?: throw CloudFailure("尚未导入节点。")
         requireCloud(nodeChoices(nodes).any { it.optString("tag") == tag }, "节点不存在。")
         commit(JSONObject(profile.toString()).put("selected", tag))
-        message = "已选择节点。"
+        message = ""
     }
 
     override fun start() {
@@ -188,7 +206,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         runCatching { process.outputStream.write("stop\n".toByteArray()); process.outputStream.flush(); process.outputStream.close() }
         if (!process.waitFor(5, TimeUnit.SECONDS)) { process.destroy(); process.waitFor(2, TimeUnit.SECONDS) }
         requireCloud(!process.isAlive, "核心监督进程尚未退出；未报告断开成功。")
-        child = null; corePid = 0; dataReady = false; phase = "idle"; message = "已断开。本次启动的核心进程已退出。"
+        child = null; corePid = 0; dataReady = false; phase = "idle"; message = ""
     }
 
     override fun diagnose(): String {
