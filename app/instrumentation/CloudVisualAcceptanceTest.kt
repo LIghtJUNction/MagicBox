@@ -17,7 +17,7 @@ import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** A JavaScript assertion is not proof that the user can see the app window. */
+/** Verify the installed app is visible, not just a WebView behind a system dialog. */
 @RunWith(AndroidJUnit4::class)
 class CloudVisualAcceptanceTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -74,6 +74,9 @@ class CloudVisualAcceptanceTest {
                         .put("page", page).put("foreground_package", owner))
                 }
             }
+            val stats = JSONObject().put("process_pss_kib", android.os.Debug.getPss())
+                .put("canvas", org.json.JSONTokener(js(scenario, "CloudUI.metrics()")).nextValue())
+            File(directory, "foreground-performance.json").writeText(stats.toString(2))
             js(scenario, "if(document.documentElement.dataset.theme!=='light')document.getElementById('appearance').click();document.querySelector('[data-page=home]').click()")
         }
         File(directory, "qa-manifest.json").writeText(JSONObject().put("package", context.packageName)

@@ -8,3 +8,13 @@
 #node-search{width:100%;min-height:48px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;font-size:12px;padding:13px 16px;margin:8px 0 12px}#node-search::placeholder{color:var(--muted)}#node-search:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.node-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:20px}.node-pagination .secondary-button{padding:10px 14px;min-height:46px}.node-pagination .tiny-label{text-align:center;letter-spacing:0}
 /* Horizontal dissolution preserves normal vertical page scrolling and zoom. */
 [data-token]{touch-action:pan-y pinch-zoom}
+
+/* Short screens keep mode choices close to the primary action, without
+   shrinking touch targets or removing normal page scrolling. */
+@media(max-height:820px) and (max-width:599px){
+ .topbar{height:76px}.eyebrow{margin-top:10px}h1{font-size:46px}
+ .cloud-stage{height:170px}#cloud{height:148px}
+ .connection-state{margin-top:8px}.status-detail{margin-bottom:16px}
+ .mode-section{margin-top:18px}.mode{min-height:98px}
+ .destination{padding-top:18px;padding-bottom:18px}
+}
