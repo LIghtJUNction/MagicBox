@@ -11,6 +11,9 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import org.junit.FixMethodOrder
+import org.junit.runners.MethodSorters
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.runner.RunWith
 import java.io.File
 import java.net.ServerSocket
@@ -20,6 +23,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class CloudDeviceTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
@@ -58,7 +62,7 @@ class CloudDeviceTest {
         File(directory, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
         image.recycle()
     }
-    @Test fun localUiAndMotionLifecycle() {
+    @Test fun a_localUiAndMotionLifecycle() {
         ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
             ready(scenario); Thread.sleep(800)
             assertEquals("0", js(scenario, "document.querySelectorAll('iframe').length"))
@@ -75,20 +79,29 @@ class CloudDeviceTest {
             js(scenario, "document.querySelector('[data-mode=tun]').click()")
             Thread.sleep(150); screenshot("token-split")
             Thread.sleep(850)
+            js(scenario, """
+                (()=>{const el=document.getElementById('cloud-stage'),r=el.getBoundingClientRect();
+                el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,isPrimary:true,pointerId:31,button:0,clientX:r.x+80,clientY:r.y+90}));
+                el.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,isPrimary:true,pointerId:31,button:0,clientX:r.x+140,clientY:r.y+100}));})()
+            """.trimIndent())
+            Thread.sleep(180); screenshot("token-drag")
+            js(scenario,"document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:31}))")
+            Thread.sleep(850)
             assertEquals("0", js(scenario, "CloudUI.metrics().active"))
             val before = js(scenario, "CloudUI.metrics().frames")
             Thread.sleep(1500)
             assertEquals("Idle UI must not keep animating", before, js(scenario, "CloudUI.metrics().frames"))
             val directory = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-            File(directory,"canvas-metrics.json").writeText(js(scenario,"JSON.stringify(CloudUI.metrics())"))
+            File(directory,"canvas-metrics.json").writeText(js(scenario,"CloudUI.metrics()"))
         }
     }
-    @Test fun standaloneProxyMovesRealSocketDataAndStops() {
+    @Test fun b_standaloneProxyMovesRealSocketDataAndStops() {
         assumeTrue(BuildConfig.STANDALONE)
         ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
             ready(scenario)
             ServerSocket(0).use { upstream ->
                 val serverDone = CountDownLatch(1)
+                val serverError = AtomicReference<Throwable?>()
                 thread(isDaemon = true, name = "fixture-upstream") {
                     try {
                         upstream.accept().use { socket ->
@@ -104,9 +117,25 @@ class CloudDeviceTest {
                             socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\nmagicbox-e2e".toByteArray())
                             socket.getOutputStream().flush()
                         }
+                    } catch (error: Throwable) {
+                        // Cleanup may close accept() after an earlier assertion failed.
+                        // Capture this failure instead of crashing the instrumentation process.
+                        serverError.set(error)
                     } finally { serverDone.countDown() }
                 }
                 val imported = call("import",JSONObject().put("text","http://127.0.0.1:${upstream.localPort}#Fixture"))
+                if (!imported.optBoolean("ok")) {
+                    val directory=File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
+                    val native=File(context.applicationInfo.nativeLibraryDir)
+                    val result=boundedProcess(listOf(File(native,"libsingbox.so").path,"version"))
+                    File(directory,"core-version.txt").writeText(result.toString())
+                    val converted=boundedProcess(listOf(File(native,"libproxylink.so").path), "http://127.0.0.1:1080#Fixture".toByteArray())
+                    File(directory,"fixture-import.txt").writeText(converted.toString())
+                    val candidate=File(context.cacheDir,"fixture.json")
+                    candidate.writeText(makeCoreConfig(JSONObject("""{"outbounds":[{"type":"http","tag":"Fixture","server":"127.0.0.1","server_port":1080}]}"""),"system","Fixture","fixture-only","/sys/fs/cgroup").toString())
+                    val checked=boundedProcess(listOf(File(native,"libsingbox.so").path,"check","-c",candidate.path))
+                    File(directory,"fixture-check.txt").writeText(checked.toString());candidate.delete()
+                }
                 assertTrue(imported.toString(), imported.optBoolean("ok"))
                 val start = call("start")
                 assertTrue(start.toString(), start.optBoolean("ok"))
@@ -119,6 +148,7 @@ class CloudDeviceTest {
                         assertTrue("Proxy failed to relay the fixture response", response.contains("magicbox-e2e"))
                     }
                     assertTrue(serverDone.await(5,TimeUnit.SECONDS))
+                    assertNull(serverError.get()?.toString(), serverError.get())
                     val rejected = call("import",JSONObject().put("text","unknown://not-supported"))
                     assertFalse(rejected.optBoolean("ok"))
                     assertTrue(call("status").getJSONObject("data").optBoolean("running"))
@@ -132,7 +162,7 @@ class CloudDeviceTest {
             }
         }
     }
-    @Test fun uiEditionCannotBecomeStandalone() {
+    @Test fun c_uiEditionCannotBecomeStandalone() {
         assumeTrue(!BuildConfig.STANDALONE)
         val status=call("status").getJSONObject("data")
         assertEquals("ui",status.getString("edition"))

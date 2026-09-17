@@ -2,7 +2,6 @@ package com.github.lightjunction.magicbox
 
 import org.json.JSONArray
 import org.json.JSONObject
-import org.json.JSONTokener
 import java.io.InputStream
 
 internal const val CLOUD_INPUT_LIMIT = 2 * 1024 * 1024
@@ -23,33 +22,19 @@ internal fun InputStream.readLimited(limit: Int): ByteArray {
     }
     return out.toByteArray()
 }
-/** Check depth before invoking Android's recursive JSON parser. */
+/** Validate syntax and nesting before Android's permissive recursive parser. */
 internal fun cloudJson(text: String): JSONObject {
     requireCloud(text.length <= CLOUD_OUTPUT_LIMIT, "状态或配置过大。")
-    var depth = 0; var quoted = false; var escaped = false
-    for (character in text) {
-        if (quoted) {
-            if (escaped) escaped = false else if (character == '\\') escaped = true else if (character == '"') quoted = false
-        } else when (character) {
-            '"' -> quoted = true
-            '{', '[' -> { depth++; requireCloud(depth <= 32, "配置嵌套过深。") }
-            '}', ']' -> { depth--; requireCloud(depth >= 0, "JSON 结构无效。") }
-            '\'', '/' -> throw CloudFailure("需要严格的 JSON 对象。")
-        }
-    }
-    requireCloud(!quoted && depth == 0, "JSON 不完整。")
     return try {
-        val reader = JSONTokener(text)
-        val value = reader.nextValue()
-        requireCloud(value is JSONObject && reader.nextClean() == '\u0000', "需要单一 JSON 对象。")
-        value as JSONObject
+        StrictJson(text).objectDocument()
+        JSONObject(text)
     } catch (error: CloudFailure) { throw error }
       catch (_: Exception) { throw CloudFailure("JSON 解析失败。") }
 }
 internal fun machineData(text: String, command: String): JSONObject {
     val envelope = cloudJson(text)
-    requireCloud(envelope.opt("schema") is Number && envelope.optInt("schema", -1) == 1 &&
-        envelope.opt("ok") == true && envelope.optString("command") == command,
+    requireCloud(envelope.opt("schema") == 1 &&
+        envelope.opt("ok") == true && envelope.opt("command") == command,
         "MagicNet 的机器接口不兼容或读取失败；不会使用旧状态冒充成功。")
     return envelope.optJSONObject("data") ?: throw CloudFailure("MagicNet 状态缺少数据。")
 }
