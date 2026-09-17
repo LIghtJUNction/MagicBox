@@ -86,10 +86,13 @@ internal fun makeCoreConfig(document: JSONObject, mode: String, selected: String
     if (mode == "ebpf") inbounds.put(JSONObject().put("type", "ebpf").put("tag", "tun-in").put("mode", "local")
         .put("network", JSONArray(listOf("tcp", "udp"))).put("local", JSONObject().put("dns_mode", "hijack").put("cgroup_path", cgroup)
             .put("ipv6", true).put("bypass_private_address", true).put("exclude_uid", JSONArray(listOf(0)))))
+    // Android app UIDs cannot open netlink route monitors. A loopback mixed
+    // proxy uses the OS default route and needs no privileged monitor at all.
+    // Transparent root modes still require it to avoid routing back into TUN.
     return JSONObject().put("log", JSONObject().put("level", "warn").put("timestamp", false))
         .put("inbounds", inbounds).put("outbounds", outbounds).put("endpoints", document.optJSONArray("endpoints") ?: JSONArray())
         .put("dns", JSONObject().put("servers", JSONArray().put(JSONObject().put("type", "udp").put("server", "1.1.1.1").put("tag", CLOUD_DNS))))
-        .put("route", JSONObject().put("auto_detect_interface", true).put("default_domain_resolver", CLOUD_DNS)
+        .put("route", JSONObject().put("auto_detect_interface", mode != "system").put("default_domain_resolver", CLOUD_DNS)
             .put("rules", JSONArray().put(JSONObject().put("protocol", "dns").put("action", "hijack-dns"))).put("final", CLOUD_SELECTOR))
         .put("experimental", JSONObject().put("clash_api", JSONObject().put("external_controller", "127.0.0.1:$CLOUD_API_PORT").put("secret", secret)))
 }
