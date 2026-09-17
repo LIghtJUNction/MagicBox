@@ -5,6 +5,8 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.json.JSONTokener
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,19 +42,25 @@ class CloudRefineTest {
         fail("Refined UI did not load")
     }
 
+    private fun clickMetrics(scenario: ActivityScenario<CloudActivity>): JSONObject {
+        val encoded = js(scenario, "JSON.stringify(MagicClick.metrics())")
+        return JSONObject(JSONTokener(encoded).nextValue() as String)
+    }
+
     @Test fun navigationClickStillProducesVisibleCharacterBurst() {
         ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
             ready(scenario)
             js(scenario, "if(document.getElementById('reduce-motion').getAttribute('aria-checked')==='true')document.getElementById('reduce-motion').click();document.querySelector('[data-page=home]').click()")
             Thread.sleep(900)
-            val before = js(scenario, "MagicClick.metrics().frames").toInt()
+            val before = clickMetrics(scenario).getInt("frames")
             js(scenario, "document.getElementById('choose-node').click()")
             Thread.sleep(140)
             assertEquals("false", js(scenario, "document.getElementById('page-subscriptions').hidden"))
-            assertTrue(js(scenario, "MagicClick.metrics().active").toInt() > 0)
-            assertTrue(js(scenario, "MagicClick.metrics().frames").toInt() > before)
+            val during = clickMetrics(scenario)
+            assertTrue("Click burst inactive: $during", during.getInt("active") > 0)
+            assertTrue("Click burst did not paint: $during", during.getInt("frames") > before)
             Thread.sleep(950)
-            assertEquals("0", js(scenario, "MagicClick.metrics().active"))
+            assertEquals(0, clickMetrics(scenario).getInt("active"))
         }
     }
 
