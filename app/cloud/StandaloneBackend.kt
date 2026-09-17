@@ -75,7 +75,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         }
         val doc = profile.optJSONObject("nodes")
         val choices = doc?.let { runCatching { nodeChoices(it) }.getOrDefault(emptyList()) } ?: emptyList()
-        val result = baseState(context, root.authorized, currentMode)
+        return baseState(context, root.authorized, currentMode)
             .put("phase", if (!componentsReady()) "blocked" else phase)
             .put("running", child != null)
             .put("message", if (!componentsReady()) "此 APK 缺少当前架构的完整组件，不能启动代理。" else message)
@@ -84,15 +84,32 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
             .put("modes", JSONArray().put(modeEntry("system", componentsReady()))
                 .put(modeEntry("tun", root.authorized && tun, "需要 Root 和可用的 TUN 设备；请先申请权限。"))
                 .put(modeEntry("ebpf", ebpf, "需要 Root、支持 eBPF 的内核和可验证的设备能力。")))
-        return result
     }
 
     override fun mode(value: String) {
         requireCloud(child == null, "请先断开，再切换连接方式。")
         requireCloud(value == "system" || value == "tun" && root.authorized && tun || value == "ebpf" && ebpf,
             "当前设备尚未通过此模式的能力检查。")
-        val next = JSONObject(profile.toString()).put("mode", value)
-        commit(next); message = if (value == "system") "系统代理" else value.uppercase()
+        commit(JSONObject(profile.toString()).put("mode", value))
+        message = if (value == "system") "系统代理" else value.uppercase()
+    }
+
+    private fun convertRemote(source: String): ProcessResult {
+        var lastFetchError: CloudFailure? = null
+        var lastConversion: ProcessResult? = null
+        for (userAgent in SUBSCRIPTION_USER_AGENTS) {
+            val bytes = try {
+                downloadSubscription(source, userAgent)
+            } catch (error: CloudFailure) {
+                lastFetchError = error
+                continue
+            }
+            val converted = boundedProcess(listOf(converter.path), bytes, seconds = 10)
+            if (converted.success) return converted
+            lastConversion = converted
+        }
+        if (lastConversion != null) return lastConversion
+        throw lastFetchError ?: CloudFailure("无法获取订阅。原配置未变。")
     }
 
     override fun importText(value: String) {
@@ -100,15 +117,14 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         requireCloud(componentsReady(), "内置组件不完整，无法转换订阅。")
         val input = validateInput(value)
         val source = value.trim().takeIf { it.startsWith("https://") && !it.contains('\n') }.orEmpty()
-        val bytes = if (source.isNotEmpty()) downloadSubscription(source) else input
-        val converted = boundedProcess(listOf(converter.path), bytes, seconds = 30)
+        val converted = if (source.isNotEmpty()) convertRemote(source)
+            else boundedProcess(listOf(converter.path), input, seconds = 15)
         requireCloud(converted.success, "无法解析此订阅。原配置未变。")
         val rawDocument = cloudJson(converted.stdout)
         val skipped = rawDocument.optJSONObject("_magicbox")?.optInt("skipped", 0) ?: 0
         val document = safeNodeDocument(rawDocument)
         val choices = nodeChoices(document)
         val chosen = selected.takeIf { old -> choices.any { it.optString("tag") == old } } ?: choices.first().getString("tag")
-        // Validate without privileged inbounds before committing the canonical profile.
         checkConfig(makeCoreConfig(document, "system", chosen, UUID.randomUUID().toString(), cgroup), privileged = false)
         commit(JSONObject(profile.toString()).put("nodes", document).put("selected", chosen).put("source", source))
         message = if (skipped > 0) "已导入 ${choices.size} · ${skipped} 未兼容" else "已导入 ${choices.size} 个节点"
