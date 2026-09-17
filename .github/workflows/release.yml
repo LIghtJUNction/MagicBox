@@ -1,23 +1,8 @@
-name: Release
+name: Release reviewed Token Cloud
 on:
   push:
-    branches: ["publish/**"]
-    paths: [".github/release-request.json"]
-  workflow_dispatch:
-    inputs:
-      validated_run:
-        description: Successful Token Cloud push-run ID
-        required: true
-        type: string
-      reviewed_sha:
-        description: Exact 40-character commit reviewed with its device screenshots
-        required: true
-        type: string
-      tag:
-        description: Alpha version already embedded in the verified APKs
-        default: v0.2.0-alpha.1
-        required: true
-        type: string
+    branches: [publish/token-cloud-reviewed-20260917]
+    paths: [.github/release-request.json]
 permissions:
   contents: write
   actions: read
@@ -26,65 +11,71 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
+    if: github.repository == 'LIghtJUNction/MagicBox'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
-      RUN_ID: ${{ inputs.validated_run }}
-      REVIEWED_SHA: ${{ inputs.reviewed_sha }}
-      RELEASE_TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.reviewed_sha || github.sha }}
-      - name: Read explicit Git release request
-        if: github.event_name == 'push'
+          persist-credentials: false
+      - name: Read explicit visual approval
         run: |
-          python3 - <<'PYCODE'
+          python3 - <<'PY'
           import json, os, re
           from pathlib import Path
           path=Path('.github/release-request.json')
-          assert path.stat().st_size < 2048
+          assert path.stat().st_size < 16384
           request=json.loads(path.read_text())
-          assert set(request)=={'validated_run','reviewed_sha','tag'}
-          fields={'RUN_ID':str(request['validated_run']), 'REVIEWED_SHA':request['reviewed_sha'], 'RELEASE_TAG':request['tag']}
+          assert request['visually_reviewed'] is True
+          fields={'RUN_ID':str(request['validated_run']), 'REVIEWED_SHA':request['reviewed_sha'], 'HEAD_SHA':request['head_sha'], 'RELEASE_TAG':request['tag']}
           assert re.fullmatch(r'[0-9]+',fields['RUN_ID'])
-          assert re.fullmatch(r'[0-9a-f]{40}',fields['REVIEWED_SHA'])
+          assert all(re.fullmatch(r'[0-9a-f]{40}',fields[k]) for k in ('REVIEWED_SHA','HEAD_SHA'))
           assert re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+',fields['RELEASE_TAG'])
           with open(os.environ['GITHUB_ENV'],'a') as env:
               for key,value in fields.items(): env.write(f'{key}={value}\n')
-          PYCODE
-      - name: Verify immutable validation run
-        shell: bash
+          PY
+      - name: Verify immutable successful source and device run
         run: |
           set -euo pipefail
-          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
-          [[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" > jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$REVIEWED_SHA" > reviewed.json
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$HEAD_SHA" > head.json
           python3 - <<'PY'
-          import json, os
+          import json,os
           run=json.load(open('run.json'))
           assert run['conclusion']=='success' and run['status']=='completed'
-          assert run['head_sha']==os.environ['REVIEWED_SHA']
-          assert run['event']=='push' and run['path']=='.github/workflows/token-cloud.yml'
+          assert run['name']=='Token Cloud' and run['path']=='.github/workflows/token-cloud.yml'
+          assert run['head_sha']==os.environ['HEAD_SHA']
           assert run['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
-          assert run['head_branch'] in ('main','codex/token-cloud-reboot')
+          assert run['event'] in ('push','pull_request') and run['head_branch'] in ('main','codex/token-cloud-reboot')
+          jobs=json.load(open('jobs.json'))['jobs']
+          assert all(any(j['name']==name and j['conclusion']=='success' for j in jobs) for name in ('native','validate','device'))
+          # PR jobs compile a merge ref. Require its complete tree to equal
+          # the approved feature head, not just a related parent or branch name.
+          reviewed=json.load(open('reviewed.json')); head=json.load(open('head.json'))
+          assert reviewed['sha']==os.environ['REVIEWED_SHA'] and head['sha']==os.environ['HEAD_SHA']
+          assert reviewed['tree']['sha']==head['tree']['sha']
           PY
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Release already exists; refusing to overwrite tested artifacts.' >&2
+            echo 'Refusing to overwrite an existing release.' >&2
             exit 1
           fi
-      - name: Download only the selected run artifacts
+      - name: Download the selected immutable artifacts
         run: |
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-validation --dir validated
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name android-device-evidence --dir device
-      - name: Check exact bytes and prepare both editions
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name native-evidence --dir native-evidence
+      - name: Verify exact APK bytes and inspected screenshots
         run: |
           python3 scripts/test-prepare-alpha.py
+          python3 scripts/verify-visual-approval.py
           python3 scripts/prepare-alpha.py --sha "$REVIEWED_SHA" --tag "$RELEASE_TAG"
-      - name: Include pinned dependency sources and validation evidence
-        shell: bash
+          cp .github/release-request.json release/visual-approval.json
+          cp device/universal-tests.txt device/ui-tests.txt release/
+      - name: Include corresponding pinned dependency source
         run: |
           set -euo pipefail
           mkdir dependencies-source
@@ -95,22 +86,37 @@ jobs:
           gh api "repos/LIghtJUNction/sing-box/zipball/$core" > dependencies-source/sing-box.zip
           gh api repos/Fanju6/Proxylink/zipball/44929c0984944870297c260dc43a4aa9262f9e1c > dependencies-source/Proxylink.zip
           tar -czf "release/MagicBox-$RELEASE_TAG-dependencies-source.tar.gz" dependencies-source
-          tar -czf "release/MagicBox-$RELEASE_TAG-device-evidence.tar.gz" device
+          tar -czf "release/MagicBox-$RELEASE_TAG-evidence.tar.gz" device native-evidence
           (cd release && sha256sum * > SHA256SUMS)
-      - name: Publish Alpha, never unsigned or untested builds
-        shell: bash
+      - name: Upload a draft and verify every uploaded digest before publishing
         run: |
           set -euo pipefail
           cat > notes.md <<'NOTES'
-          MagicBox Token Cloud Alpha — two co-installable test editions.
+          ## MagicBox · Token 云集合
 
-          Universal: com.github.lightjunction.magicbox — bundled sing-box, converter and supervised runtime; arm64-v8a + x86_64.
-          UI: com.github.lightjunction.magicbox.ui — root + an enabled compatible MagicNet module are mandatory. No proxy core is bundled.
+          两个可同时安装的 Alpha 测试版本：
+          - **universal 通用版**：`com.github.lightjunction.magicbox`，内置 sing-box、订阅转换器、运行监督组件，不依赖 MagicNet 模块。包含 arm64-v8a / x86_64。
+          - **ui 界面版**：`com.github.lightjunction.magicbox.ui`，不包含代理内核，必须明确授予 Root 并安装、启用兼容的 MagicNet 模块。
 
-          These are the exact signed test APKs from the successful Android 35 emulator validation. UI screenshots, socket proxy transfer, stop behavior, failed-import retention and package isolation are included in the evidence archive. CI test signing is not the future stable release key; a later differently signed test build may require uninstalling the older test build first.
+          本次为经过测试的原始 APK，不重新构建、不重新签名。两版使用 CI 测试签名（debug），不是长期生产签名；旧测试包证书不同时无法直接覆盖安装，卸载前请先保存订阅与设置。
 
-          System proxy provides HTTP/SOCKS on 127.0.0.1:2080; configure Wi-Fi or supported apps manually. It is not a VPN. Rooted physical-device TUN/eBPF, network switching and sleep recovery remain experimental and have not been certified by emulator tests. Subscription formats are explicitly enumerated in README; unknown extensions fail rather than being silently dropped.
+          已完成两版各 91 项单元测试、内核组件隔离和签名校验、Android 35 模拟器双包安装、通用版真实 socket 转发、停止、错误导入保留、真实手指拖动、搜索分页与十二张明暗界面截图检查。拖动控制权从画布转给容器不再提前结束动画；静止和按住不动时不继续重绘。证据、校验和及对应源码附在下方。
+
+          **使用边界：** 系统代理提供 `127.0.0.1:2080` 的 HTTP / SOCKS 服务，需要在 Wi-Fi 或支持代理的应用中手动配置，不是全设备 VPN。TUN 需要 Root；eBPF 还需要支持的内核与设备能力。Root 真机 TUN/eBPF、已安装 MagicNet 的完整联调、切网与休眠恢复、实机帧率和功耗尚未完成验收，不能以模拟器测试替代。
+
+          订阅在本机转换，不提交给第三方转换站。常见格式覆盖见源码测试；未知格式及不支持的扩展明确报错，不声称兼容所有私有格式。两个应用可同装，但不要同时开启全设备透明代理。
           NOTES
-          printf '\nValidated commit: %s\nValidation run: https://github.com/%s/actions/runs/%s\n' "$REVIEWED_SHA" "$GITHUB_REPOSITORY" "$RUN_ID" >> notes.md
+          printf '\n验证运行：https://github.com/%s/actions/runs/%s\n功能提交：%s\n实际编译源码：%s\n' "$GITHUB_REPOSITORY" "$RUN_ID" "$HEAD_SHA" "$REVIEWED_SHA" >> notes.md
           gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --target "$REVIEWED_SHA" --title "MagicBox $RELEASE_TAG · Token Cloud" --notes-file notes.md --prerelease --latest=false --draft
-          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > uploaded.json
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          assets={a['name']:a for a in json.load(open('uploaded.json'))['assets']}
+          for path in Path('release').iterdir():
+              if path.is_file():
+                  assert path.name in assets
+                  assert assets[path.name]['size']==path.stat().st_size
+                  assert assets[path.name]['digest']=='sha256:'+hashlib.sha256(path.read_bytes()).hexdigest()
+          PY
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
