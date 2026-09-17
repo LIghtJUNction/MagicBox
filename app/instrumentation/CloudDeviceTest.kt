@@ -57,7 +57,17 @@ class CloudDeviceTest {
     }
     private fun screenshot(name: String) {
         val directory = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        val activePackage = instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString()
+        // UiAutomation connects lazily. Its first accessibility snapshot can
+        // be null even though the Activity is resumed; keep checking the actual
+        // foreground owner rather than weakening the no-obscuring-window gate.
+        var activePackage: String? = null
+        for (attempt in 0 until 15) {
+            val window = instrumentation.uiAutomation.rootInActiveWindow
+            activePackage = window?.packageName?.toString()
+            window?.recycle()
+            if (activePackage == context.packageName) break
+            Thread.sleep(200)
+        }
         assertEquals("An external window covers the app; screenshot is not acceptance evidence", context.packageName, activePackage)
         val image = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull("Missing device screenshot", image)
