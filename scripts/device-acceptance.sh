@@ -20,6 +20,7 @@ adb shell wm size 720x1600
 adb shell wm density 320
 adb shell cmd uimode night no
 adb shell settings put system screen_off_timeout 1800000
+adb shell svc power stayon true
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell am force-stop com.google.android.apps.nexuslauncher
@@ -50,6 +51,7 @@ for edition in universal ui; do
   adb uninstall "$package.test"
 done
 collect_evidence
+trap - EXIT
 if grep -q 'Process: com.github.lightjunction.magicbox' evidence/device/crashes.txt ||
    grep -E 'am_anr.*com.github.lightjunction.magicbox' evidence/device/events.txt; then failed=1; fi
 exit "$failed"

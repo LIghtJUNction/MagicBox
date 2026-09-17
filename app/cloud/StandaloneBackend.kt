@@ -40,6 +40,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
     private fun componentsReady() = core.canExecute() && converter.canExecute() && helper.canExecute()
 
     override fun authorize() {
+        tun = false; ebpf = false
         super.authorize()
         tun = root.run("test -c /dev/net/tun").success
         for (candidate in listOf("/sys/fs/cgroup", "/dev/cg2_bpf")) {
@@ -131,9 +132,9 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         val document = profile.optJSONObject("nodes") ?: throw CloudFailure("请先导入节点。")
         if (currentMode != "system") {
             requireCloud(root.authorized, "此模式需要 Root 权限。")
-            val module = root.run("if test -x '$MAGICNET_CLI'; then '$MAGICNET_CLI' --json service status; fi", seconds = 10)
-            requireCloud(module.success, "无法确认 MagicNet 是否已停止，未接管流量。")
-            if (module.stdout.isNotBlank()) {
+            val module = root.run("if test -x '$MAGICNET_CLI'; then '$MAGICNET_CLI' --json service status; else printf absent; fi", seconds = 10)
+            requireCloud(module.success, "无法确认 MagicNet 是否运行；请先检查模块状态。")
+            if (module.stdout.trim() != "absent") {
                 val data = machineData(module.stdout, "service.status")
                 requireCloud(data.optJSONObject("core")?.optJSONObject("sing_box")?.optString("process_state") == "stopped",
                     "MagicNet 正在运行或状态不确定。两个版本可同时安装，但不能同时接管全设备流量。")

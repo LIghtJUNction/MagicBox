@@ -57,6 +57,8 @@ class CloudDeviceTest {
     }
     private fun screenshot(name: String) {
         val directory = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
+        val activePackage = instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString()
+        assertEquals("An external window covers the app; screenshot is not acceptance evidence", context.packageName, activePackage)
         val image = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull("Missing device screenshot", image)
         File(directory, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -64,18 +66,20 @@ class CloudDeviceTest {
     }
     @Test fun a_localUiAndMotionLifecycle() {
         ActivityScenario.launch(CloudActivity::class.java).use { scenario ->
-            ready(scenario); Thread.sleep(800)
+            ready(scenario)
+            js(scenario, "if(document.documentElement.dataset.theme==='dark')document.getElementById('appearance').click()")
+            Thread.sleep(1100)
             assertEquals("0", js(scenario, "document.querySelectorAll('iframe').length"))
             assertEquals("false", js(scenario, "document.documentElement.scrollWidth > innerWidth"))
             screenshot("home-light")
             js(scenario, "document.getElementById('appearance').click()")
-            Thread.sleep(750); screenshot("home-dark")
+            Thread.sleep(1100); screenshot("home-dark")
             js(scenario, "document.querySelector('[data-page= subscriptions]').click()")
-            Thread.sleep(750); screenshot("subscriptions-dark")
+            Thread.sleep(1100); screenshot("subscriptions-dark")
             js(scenario, "document.querySelector('[data-page= settings]').click()")
-            Thread.sleep(750); screenshot("settings-dark")
+            Thread.sleep(1100); screenshot("settings-dark")
             js(scenario, "document.getElementById('appearance').click(); document.querySelector('[data-page=home]').click()")
-            Thread.sleep(750)
+            Thread.sleep(1100)
             js(scenario, "document.querySelector('[data-mode=tun]').click()")
             Thread.sleep(150); screenshot("token-split")
             Thread.sleep(850)
@@ -84,7 +88,9 @@ class CloudDeviceTest {
                 el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,isPrimary:true,pointerId:31,button:0,clientX:r.x+80,clientY:r.y+90}));
                 el.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,isPrimary:true,pointerId:31,button:0,clientX:r.x+140,clientY:r.y+100}));})()
             """.trimIndent())
-            Thread.sleep(180); screenshot("token-drag")
+            Thread.sleep(180)
+            assertTrue("Drag must produce visible particles", js(scenario,"CloudUI.metrics().active").toInt() > 0)
+            screenshot("token-drag")
             js(scenario,"document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:31}))")
             Thread.sleep(850)
             assertEquals("0", js(scenario, "CloudUI.metrics().active"))

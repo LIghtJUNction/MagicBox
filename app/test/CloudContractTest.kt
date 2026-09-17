@@ -22,6 +22,7 @@ class CloudContractTest {
     @Test fun systemModeIsLoopbackAndNeverInstallsATun() {
         val config=makeCoreConfig(safeNodeDocument(JSONObject(node)),"system","one","private-key","/sys/fs/cgroup")
         assertEquals(1,config.getJSONArray("inbounds").length())
+        assertFalse(config.getJSONObject("route").getBoolean("auto_detect_interface"))
         assertEquals("127.0.0.1",config.getJSONArray("inbounds").getJSONObject(0).getString("listen"))
         assertEquals("private-key",config.getJSONObject("experimental").getJSONObject("clash_api").getString("secret"))
     }
