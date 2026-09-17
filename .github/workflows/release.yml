@@ -2,7 +2,7 @@ name: Release reviewed alpha
 on:
   push:
     branches: [release/token-cloud-verified]
-    paths: [release/approval.json]
+    paths: [release/approval.json, scripts/finalize-reviewed.py, .github/workflows/release.yml]
   workflow_dispatch:
 permissions:
   contents: write
@@ -22,10 +22,10 @@ jobs:
           persist-credentials: false
       - name: Verify promotion guards
         run: python3 scripts/test_publish_reviewed.py
-      - name: Publish exact reviewed test artifacts
+      - name: Verify and finalize the exact existing draft by release ID
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/publish-reviewed.py
+        run: python3 scripts/finalize-reviewed.py
       - name: Mark the unchanged validated implementation ready
         env:
           GH_TOKEN: ${{ github.token }}
