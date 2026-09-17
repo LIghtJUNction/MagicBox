@@ -39,8 +39,15 @@ internal fun validateInput(value: String): ByteArray {
     return bytes
 }
 
+internal val SUBSCRIPTION_USER_AGENTS = listOf(
+    "MagicBox/${BuildConfig.VERSION_NAME} sing-box",
+    "mihomo/1.19.0",
+    "ClashMetaForAndroid/2.11.14.Meta",
+    "sing-box/1.12.0",
+)
+
 /** HTTPS only; no downgrade, userinfo or implicit use of another local proxy. */
-internal fun downloadSubscription(value: String): ByteArray {
+internal fun downloadSubscription(value: String, userAgent: String = SUBSCRIPTION_USER_AGENTS.first()): ByteArray {
     var uri = runCatching { URI(value) }.getOrNull() ?: throw CloudFailure("订阅地址无效。")
     repeat(4) {
         requireCloud(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.rawUserInfo == null && uri.fragment == null,
@@ -49,7 +56,7 @@ internal fun downloadSubscription(value: String): ByteArray {
         try {
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 10000; connection.readTimeout = 15000
-            connection.setRequestProperty("User-Agent", "MagicBox/${BuildConfig.VERSION_NAME} sing-box")
+            connection.setRequestProperty("User-Agent", userAgent)
             connection.setRequestProperty("Accept-Encoding", "identity")
             when (connection.responseCode) {
                 in 200..299 -> return connection.inputStream.use { it.readLimited(CLOUD_INPUT_LIMIT) }
