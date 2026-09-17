@@ -42,7 +42,6 @@ internal fun validateInput(value: String): ByteArray {
 internal val SUBSCRIPTION_USER_AGENTS = listOf(
     "MagicBox/${BuildConfig.VERSION_NAME} sing-box",
     "mihomo/1.19.0",
-    "ClashMetaForAndroid/2.11.14.Meta",
     "sing-box/1.12.0",
 )
 
@@ -55,7 +54,7 @@ internal fun downloadSubscription(value: String, userAgent: String = SUBSCRIPTIO
         val connection = uri.toURL().openConnection(Proxy.NO_PROXY) as HttpURLConnection
         try {
             connection.instanceFollowRedirects = false
-            connection.connectTimeout = 10000; connection.readTimeout = 15000
+            connection.connectTimeout = 6000; connection.readTimeout = 8000
             connection.setRequestProperty("User-Agent", userAgent)
             connection.setRequestProperty("Accept-Encoding", "identity")
             when (connection.responseCode) {
