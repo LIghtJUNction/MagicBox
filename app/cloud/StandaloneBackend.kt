@@ -23,7 +23,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
     private val converter = File(nativeDir, "libproxylink.so")
     private val helper = File(nativeDir, "libmbprobe.so")
     private val config = File(directory, "runtime.json")
-    private var profile = runCatching { profileFile.openRead().use { JSONObject(String(it.readLimited(CLOUD_OUTPUT_LIMIT), Charsets.UTF_8)) } }
+    private var profile = runCatching { profileFile.openRead().use { cloudJson(String(it.readLimited(CLOUD_OUTPUT_LIMIT), Charsets.UTF_8)) } }
         .getOrElse { JSONObject().put("mode", "system") }
     private var child: Process? = null
     private var corePid = 0
@@ -52,7 +52,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
     private fun probeEbpf(): Boolean {
         if (!root.authorized || !core.canExecute()) return false
         val result = root.run("${shellQuote(core.path)} tools ebpf status --mode local --network tcp,udp --cgroup ${shellQuote(cgroup)} --json", seconds = 15)
-        val report = runCatching { JSONObject(result.stdout) }.getOrNull()
+        val report = runCatching { cloudJson(result.stdout) }.getOrNull()
         return result.success && report?.optString("result") == "supported" &&
             report.optJSONObject("summary")?.optInt("required_failures", -1) == 0
     }
@@ -102,7 +102,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         val bytes = if (source.isNotEmpty()) downloadSubscription(source) else input
         val converted = boundedProcess(listOf(converter.path), bytes, seconds = 30)
         requireCloud(converted.success, "订阅未能完整转换，已保留原配置。请检查格式或不受支持的节点。")
-        val document = safeNodeDocument(JSONObject(converted.stdout))
+        val document = safeNodeDocument(cloudJson(converted.stdout))
         val choices = nodeChoices(document)
         val chosen = selected.takeIf { old -> choices.any { it.optString("tag") == old } } ?: choices.first().getString("tag")
         // Validate without privileged inbounds before committing the canonical profile.
@@ -132,6 +132,7 @@ internal class StandaloneBackend(private val context: Context) : CloudBackend {
         if (currentMode != "system") {
             requireCloud(root.authorized, "此模式需要 Root 权限。")
             val module = root.run("if test -x '$MAGICNET_CLI'; then '$MAGICNET_CLI' --json service status; fi", seconds = 10)
+            requireCloud(module.success, "无法确认 MagicNet 是否已停止，未接管流量。")
             if (module.stdout.isNotBlank()) {
                 val data = machineData(module.stdout, "service.status")
                 requireCloud(data.optJSONObject("core")?.optJSONObject("sing_box")?.optString("process_state") == "stopped",

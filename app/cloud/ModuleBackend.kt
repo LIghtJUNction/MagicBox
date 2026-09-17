@@ -40,7 +40,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
             "MagicNet 不支持所需的机器接口，请先更新模块。")
         compatible = true
         val probe = root.run("'/data/adb/modules/MagicNet/bin/sing-box' tools ebpf status --mode local --network tcp,udp --json", seconds = 15)
-        ebpf = probe.success && runCatching { JSONObject(probe.stdout).optString("result") == "supported" }.getOrDefault(false)
+        ebpf = probe.success && runCatching { cloudJson(probe.stdout).optString("result") == "supported" }.getOrDefault(false)
         notice = "已连接 MagicNet 模块。"
         status()
     }
@@ -81,11 +81,11 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         lastNodeRead = System.currentTimeMillis()
         val config = root.run("cat '/data/adb/modules/MagicNet/.config/sing-box/config.json'")
         if (!config.success) { nodes = JSONArray(); selected = ""; return }
-        val doc = runCatching { JSONObject(config.stdout) }.getOrNull() ?: return
+        val doc = runCatching { cloudJson(config.stdout) }.getOrNull() ?: return
         nodes = JSONArray(nodeChoices(doc).take(5000).map { JSONObject().put("tag", it.optString("tag")).put("type", it.optString("type")) })
         if (running) {
             val result = command("api proxies", seconds = 8)
-            val proxy = runCatching { JSONObject(result.stdout).optJSONObject("proxies")?.optJSONObject("proxy") }.getOrNull()
+            val proxy = runCatching { cloudJson(result.stdout).optJSONObject("proxies")?.optJSONObject("proxy") }.getOrNull()
             selected = proxy?.optString("now").orEmpty()
         } else { selected = "" }
     }
