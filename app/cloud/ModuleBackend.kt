@@ -11,7 +11,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
     private var compatible = false
     private var ebpf = false
     private var currentMode = "tun"
-    private var notice = "此版本必须授予 Root，并安装启用 MagicNet 模块。"
+    private var notice = "需要 Root + MagicNet"
     private var nodes = JSONArray()
     private var selected = ""
     private var lastNodeRead = 0L
@@ -42,7 +42,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
         compatible = true
         val probe = root.run("'/data/adb/modules/MagicNet/bin/sing-box' tools ebpf status --mode local --network tcp,udp --json", seconds = 15)
         ebpf = probe.success && runCatching { cloudJson(probe.stdout).optString("result") == "supported" }.getOrDefault(false)
-        notice = "已连接 MagicNet 模块。"
+        notice = "MagicNet 已连接"
         status()
     }
     override fun status(): JSONObject {
@@ -61,14 +61,14 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
                     else -> "error"
                 }
                 notice = when (phase) {
-                    "ready" -> "MagicNet 已确认控制接口与数据通道就绪。"
-                    "idle" -> "模块已连接，代理尚未启动。"
-                    "error" -> "模块进程在运行，但控制接口或数据通道尚未就绪。"
-                    else -> "模块状态尚不确定，请检查诊断。"
+                    "ready" -> "已连接"
+                    "idle" -> ""
+                    "error" -> "数据通道未就绪"
+                    else -> "状态未知"
                 }
                 if (System.currentTimeMillis() - lastNodeRead > 15000) readNodes(running)
             } catch (_: Exception) {
-                phase = "unknown"; notice = "模块状态读取失败，连接状态已标记为未知。"
+                phase = "unknown"; notice = "状态未知"
             }
         }
         return baseState(context, root.authorized, currentMode).put("phase", phase).put("running", running)
@@ -131,7 +131,7 @@ internal class ModuleBackend(private val context: Context) : CloudBackend {
             val urls = value.trim().lineSequence().filter { it.isNotBlank() }.toList()
             val action = if (urls.all { it.startsWith("https://") }) "apply-subscription" else "apply-subscription-source"
             write("webui payload $action $name", seconds = 75)
-            notice = "订阅已由 MagicNet 校验并应用。"
+            notice = "订阅已更新"
         } finally { runCatching { command("webui payload remove subscription $name") } }
     }
     override fun refresh() { write("sub update sing-box", seconds = 75) }

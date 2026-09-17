@@ -5,27 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-<title>MagicBox · Token Cloud</title>
+<title>MagicBox</title>
 <link rel="stylesheet" href="cloud.css">
+<link rel="stylesheet" href="refine.css">
 <script src="cloud.js" defer></script>
+<script src="refine.js" defer></script>
 </head>
 <body>
 <canvas id="particles" aria-hidden="true"></canvas>
 <div class="app">
 <header class="topbar">
- <div class="wordmark"><span class="mark" aria-hidden="true">{<i>·</i>}</span><span>MagicBox</span></div>
+ <div class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span><span>MagicBox</span></div>
  <button class="icon-button" id="appearance" data-token aria-label="切换明暗外观"><span aria-hidden="true">◐</span></button>
 </header>
 <main>
 <section id="page-home" class="page" aria-labelledby="home-title">
  <div class="eyebrow"><span class="edition">UNIVERSAL</span><span class="hairline"></span><span id="edition-detail">独立运行</span></div>
  <div class="hero-heading"><h1 id="home-title">连接<span class="period">。</span></h1><span class="chapter">01 / NETWORK</span></div>
- <div class="cloud-stage" id="cloud-stage" aria-label="Token 云集合，拖动可使字符散开并重新汇聚" role="img"><canvas id="cloud" aria-hidden="true"></canvas><div class="cloud-caption"><span class="micro-bracket">[</span> token 云集合 <span class="micro-bracket">]</span></div></div>
+ <div class="cloud-stage" id="cloud-stage" aria-label="字符网络，可横向拖动" role="img"><canvas id="cloud" aria-hidden="true"></canvas></div>
  <div class="connection-state" aria-live="polite"><span id="status-dot" class="status-dot"></span><span id="status-title">尚未连接</span></div>
- <p id="status-detail" class="status-detail">添加订阅，选择自己的连接方式。</p>
+ <p id="status-detail" class="status-detail"></p>
  <button id="connect" class="connect-button" data-token><span id="connect-label">建立连接</span><span class="arrow" aria-hidden="true">↗</span></button>
  <div id="preview-note" class="quiet-note" hidden>交互预览 · 此页面不会启动代理</div>
- <section class="mode-section" aria-labelledby="mode-label"><div class="section-heading"><h2 id="mode-label">连接方式</h2><button class="text-button" id="mode-help" data-token aria-label="了解连接方式">了解区别 <span aria-hidden="true">↗</span></button></div>
+ <section class="mode-section" aria-labelledby="mode-label"><div class="section-heading"><h2 id="mode-label">连接方式</h2><button class="text-button mode-info" id="mode-help" data-token aria-label="连接方式说明"><span aria-hidden="true">↗</span></button></div>
   <div class="mode-grid" id="mode-grid" role="group" aria-label="连接方式">
    <button class="mode selected" data-mode="system" data-token aria-pressed="true"><span class="mode-number">01</span><span class="mode-name">系统代理</span><span class="mode-detail">无需 Root</span><span class="mode-indicator" aria-hidden="true"></span></button>
    <button class="mode" data-mode="tun" data-token aria-pressed="false"><span class="mode-number">02</span><span class="mode-name">TUN</span><span class="mode-detail">需要 Root</span><span class="mode-indicator" aria-hidden="true"></span></button>
@@ -33,32 +35,29 @@
   </div>
  </section>
  <section class="destination" aria-labelledby="destination-label"><div><span class="tiny-label" id="destination-label">当前出口</span><p id="selected-node">还没有节点</p></div><button class="round-button" id="choose-node" data-token aria-label="选择节点"><span aria-hidden="true">↗</span></button></section>
- <div class="footer-note"><span class="small-dot"></span><span id="backend-label">同源内核，不同的轻盈。</span><span id="version-label">0.2</span></div>
+ <div class="footer-note"><span id="backend-label" hidden></span><span id="version-label">0.2</span></div>
 </section>
 <section id="page-subscriptions" class="page" aria-labelledby="subscriptions-title" hidden>
  <div class="eyebrow">YOUR CONNECTIONS</div><div class="hero-heading"><h1 id="subscriptions-title">订阅<span class="period">。</span></h1><span class="chapter">02 / SOURCES</span></div>
- <p class="page-intro">把复杂的格式，留给底层。</p>
- <div class="source-card"><div class="source-glyph" aria-hidden="true">&lt;/&gt;</div><div><h2>导入连接</h2><p>订阅链接、分享链接或配置文件</p></div></div>
+ <div class="source-card"><div class="source-glyph" aria-hidden="true">&lt;/&gt;</div><div><h2>导入</h2></div></div>
  <label class="tiny-label" for="subscription-input">订阅链接或配置内容</label>
  <textarea id="subscription-input" rows="5" maxlength="2097152" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="粘贴 HTTPS 订阅链接、节点链接、Clash YAML 或 sing-box JSON"></textarea>
  <div class="button-row"><button class="primary-button" id="import-text" data-token>解析并导入 <span aria-hidden="true">↗</span></button><button class="secondary-button" id="import-file" data-token>选择文件</button></div>
- <p class="form-hint">在本机转换，不上传到第三方转换站。无法识别的内容会明确提示，不覆盖已有配置。</p>
+ <p class="form-hint">本机解析 · 原配置安全保留</p>
  <div class="section-heading node-heading"><h2>可用节点 <span id="node-count" class="count">0</span></h2><button id="refresh-sub" class="text-button" data-token>更新订阅 ↻</button></div>
  <input id="node-search" type="search" maxlength="200" autocomplete="off" placeholder="搜索节点或协议" aria-label="搜索节点或协议" hidden>
- <div id="node-list" class="node-list"><div class="empty-state"><span aria-hidden="true">{ }</span><p>一切从一个连接开始。</p><small>导入后，节点会出现在这里。</small></div></div>
+ <div id="node-list" class="node-list"><div class="empty-state"><span aria-hidden="true">{ }</span></div></div>
  <div id="node-pagination" class="node-pagination" role="group" aria-label="节点分页" hidden><button id="node-prev" class="secondary-button" data-token>上一页</button><span id="node-page-label" class="tiny-label" aria-live="polite"></span><button id="node-next" class="secondary-button" data-token>下一页</button></div>
 </section>
 <section id="page-settings" class="page" aria-labelledby="settings-title" hidden>
  <div class="eyebrow">MADE TO FEEL LIGHT</div><div class="hero-heading"><h1 id="settings-title">偏好<span class="period">。</span></h1><span class="chapter">03 / CONTROL</span></div>
- <p class="page-intro">少一点干扰，多一点掌控。</p>
- <div class="settings-group"><div class="setting"><div><h2>减少动态效果</h2><p>静态字符，保留完整操作体验</p></div><button id="reduce-motion" class="switch" role="switch" aria-checked="false" aria-label="减少动态效果"><span></span></button></div>
- <button id="root" class="setting setting-button" data-token><div><h2>Root 权限</h2><p id="root-status">按需申请，不静默提权</p></div><span aria-hidden="true">↗</span></button>
- <button id="diagnose" class="setting setting-button" data-token><div><h2>验证网络</h2><p>经当前代理实际请求，不以进程冒充可用</p></div><span aria-hidden="true">↗</span></button>
+ <div class="settings-group"><div class="setting"><div><h2>减少动态效果</h2></div><button id="reduce-motion" class="switch" role="switch" aria-checked="false" aria-label="减少动态效果"><span></span></button></div>
+ <button id="root" class="setting setting-button" data-token><div><h2>Root 权限</h2><p id="root-status">未授权</p></div><span aria-hidden="true">↗</span></button>
+ <button id="diagnose" class="setting setting-button" data-token><div><h2>验证网络</h2></div><span aria-hidden="true">↗</span></button>
  </div>
- <div class="settings-group"><div class="setting"><div><h2 id="edition-name">MagicBox 通用版</h2><p id="components-label">内置 sing-box 与订阅转换组件</p></div><span class="small-tag edition">UNIVERSAL</span></div><div class="package-line" id="package-label">com.github.lightjunction.magicbox</div>
- <button id="advanced" class="setting setting-button" data-token hidden><div><h2>高级管理</h2><p>打开原生 MagicNet 管理界面</p></div><span aria-hidden="true">↗</span></button>
- <button id="project" class="setting setting-button" data-token><div><h2>开源与组件</h2><p>版本、源代码与许可</p></div><span aria-hidden="true">↗</span></button></div>
- <div class="design-note"><span class="tiny-label">TOKEN CLOUD / 令牌云集合</span><p>聚合成形。<br>触碰，离散。<br>松手，归于秩序。</p><span class="tiny-label">没有液态玻璃，也不需要。</span></div>
+ <div class="settings-group"><div class="setting"><div><h2 id="edition-name">MagicBox 通用版</h2><p id="components-label">内置核心</p></div><span class="small-tag edition">UNIVERSAL</span></div><div class="package-line" id="package-label">com.github.lightjunction.magicbox</div>
+ <button id="advanced" class="setting setting-button" data-token hidden><div><h2>高级管理</h2></div><span aria-hidden="true">↗</span></button>
+ <button id="project" class="setting setting-button" data-token><div><h2>开源与组件</h2></div><span aria-hidden="true">↗</span></button></div>
 </section>
 </main>
 <nav class="bottom-nav" aria-label="主导航"><button data-page="home" class="nav-item active" aria-current="page" data-token><span class="nav-symbol" aria-hidden="true">⌁</span>连接</button><button data-page="subscriptions" class="nav-item" data-token><span class="nav-symbol" aria-hidden="true">≋</span>订阅</button><button data-page="settings" class="nav-item" data-token><span class="nav-symbol" aria-hidden="true">⋮</span>偏好</button></nav>

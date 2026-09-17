@@ -25,7 +25,7 @@ class CloudActivity : ComponentActivity() {
     private val filesWorker = Executors.newSingleThreadExecutor()
     private var alive = true
     private val origin = "https://app.magicbox.invalid"
-    private val allowedFiles = mapOf("/index.html" to "text/html", "/cloud.js" to "application/javascript", "/cloud.css" to "text/css")
+    private val allowedFiles = mapOf("/index.html" to "text/html", "/cloud.js" to "application/javascript", "/cloud.css" to "text/css", "/refine.js" to "application/javascript", "/refine.css" to "text/css")
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) filesWorker.execute {
             try {
@@ -114,7 +114,7 @@ class CloudActivity : ComponentActivity() {
                                 startActivity(Intent(this@CloudActivity, MainActivity::class.java))
                             }
                             "about" -> AlertDialog.Builder(this@CloudActivity).setTitle("MagicBox ${BuildConfig.VERSION_NAME}")
-                                .setMessage("Token 云集合\n\nMagicBox：AGPL-3.0\nMagicNet：MIT\nsing-box：GPL-3.0-or-later\nProxylink：GPL-3.0\n\n通用版固定 MagicNet a94682e4 的内核源码与 44929c09 的 Proxylink。组件完整许可随 APK 附带。")
+                                .setMessage("MagicBox：AGPL-3.0\nMagicNet：MIT\nsing-box：GPL-3.0-or-later\nProxylink：GPL-3.0\n\n通用版固定 MagicNet a94682e4 的内核源码与 44929c09 的 Proxylink。组件完整许可随 APK 附带。")
                                 .setPositiveButton("源代码") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MAGICBOX_RELEASES_URL.removeSuffix("/releases")))) }
                                 .setNegativeButton("关闭", null).show()
                         }
