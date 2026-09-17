@@ -1,0 +1,26 @@
+name: Finalize verified Alpha draft
+on:
+  push:
+    branches: [publish/token-cloud-reviewed-20260917]
+    paths:
+      - .github/workflows/finalize-alpha.yml
+      - scripts/finalize-alpha.py
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: magicbox-release
+  cancel-in-progress: false
+jobs:
+  finalize:
+    if: github.repository == 'LIghtJUNction/MagicBox'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify uploaded bytes and finalize the exact existing draft by ID
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/finalize-alpha.py
