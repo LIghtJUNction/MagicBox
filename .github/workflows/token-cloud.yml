@@ -29,7 +29,7 @@ jobs:
           ref: 44929c0984944870297c260dc43a4aa9262f9e1c
           path: dependencies/Proxylink
           persist-credentials: false
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: dependencies/MagicNet/sing-box/go.mod
           cache-dependency-path: |
