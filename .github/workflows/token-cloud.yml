@@ -31,7 +31,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: dependencies/MagicNet/sing-box/go.mod
+          # Proxylink requires Go 1.26; use one toolchain for both Go modules.
+          go-version: '1.26.x'
           cache-dependency-path: |
             dependencies/MagicNet/sing-box/go.sum
             dependencies/Proxylink/Proxylink/go.sum
@@ -39,7 +40,7 @@ jobs:
         id: native-cache
         with:
           path: native-output
-          key: magicbox-native-v1-a94682e4-44929c09
+          key: magicbox-native-v2-go126-a94682e4-44929c09
       - name: Build exact shared core
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
