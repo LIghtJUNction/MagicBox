@@ -15,15 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: LIghtJUNction/MagicNet
           ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
           path: dependencies/MagicNet
           persist-credentials: false
       - run: git -C dependencies/MagicNet submodule update --init --recursive sing-box
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Fanju6/Proxylink
           ref: 44929c0984944870297c260dc43a4aa9262f9e1c
@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: |
             dependencies/MagicNet/sing-box/go.sum
             dependencies/Proxylink/Proxylink/go.sum
-      - uses: actions/cache@v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         id: native-cache
         with:
           path: native-output
@@ -76,12 +76,12 @@ jobs:
           git -C dependencies/MagicNet/sing-box rev-parse HEAD > native-output/sing-box.commit
           printf 'MagicNet=a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd\nProxylink=44929c0984944870297c260dc43a4aa9262f9e1c\nMagicBox=%s\n' "$GITHUB_SHA" > native-output/provenance.txt
           (cd native-output && sha256sum */*.so > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: shared-native-components
           path: native-output/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: native-evidence
@@ -93,8 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: shared-native-components
           path: native-output
@@ -118,7 +118,7 @@ jobs:
           ./gradlew :app:testUniversalDebugUnitTest :app:testUiDebugUnitTest :app:assembleUniversalDebug :app:assembleUiDebug :app:assembleUniversalDebugAndroidTest :app:assembleUiDebugAndroidTest --stacktrace
       - name: Verify packages, signatures and component isolation
         run: python3 scripts/verify-apks.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: android-validation
@@ -133,8 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: android-validation
           path: validated
@@ -156,7 +156,7 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash scripts/device-acceptance.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: android-device-evidence
