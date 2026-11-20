@@ -95,3 +95,9 @@ Thumbs.db
 /evidence/
 /validated/
 __pycache__/
+
+# Generated acceptance archives stay outside Git.
+/validated-*/
+/runtime-input-*/
+/artifacts/
+/dist/
