@@ -11,29 +11,31 @@ if (signingValues.any { !it.isNullOrBlank() } && !hasReleaseSigning) error("Inco
 
 android {
     namespace = providers.gradleProperty("project.namespace.base").get()
-    compileSdk = 35
+    compileSdk = providers.gradleProperty("android.compileSdk").map(String::toInt).get()
     buildToolsVersion = "35.0.0"
     defaultConfig {
         applicationId = providers.gradleProperty("project.namespace.base").get()
-        minSdk = 26
-        targetSdk = 35
+        minSdk = providers.gradleProperty("android.minSdk").map(String::toInt).get()
+        targetSdk = providers.gradleProperty("android.targetSdk").map(String::toInt).get()
         versionCode = providers.gradleProperty("project.version.code").get().toInt()
         versionName = providers.gradleProperty("project.version.name").get()
         manifestPlaceholders["appName"] = "MagicBox"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    flavorDimensions += "distribution"
+    flavorDimensions += "edition"
     productFlavors {
         create("universal") {
-            dimension = "distribution"
+            dimension = "edition"
             buildConfigField("boolean", "UI_ONLY", "false")
+            buildConfigField("boolean", "STANDALONE", "true")
             manifestPlaceholders["appName"] = "MagicBox"
             ndk { abiFilters += setOf("arm64-v8a", "x86_64") }
         }
-        create("controller") {
-            dimension = "distribution"
+        create("ui") {
+            dimension = "edition"
             applicationIdSuffix = ".ui"
             buildConfigField("boolean", "UI_ONLY", "true")
+            buildConfigField("boolean", "STANDALONE", "false")
             manifestPlaceholders["appName"] = "MagicBox UI"
         }
     }
@@ -60,7 +62,12 @@ android {
         }
     }
     sourceSets {
-        getByName("main") { manifest.srcFile("AndroidManifest.xml"); kotlin.srcDir("src"); res.srcDir("res") }
+        getByName("main") {
+            manifest.srcFile("AndroidManifest.xml")
+            kotlin.srcDirs("src", "cloud")
+            assets.srcDir("assets")
+            res.srcDir("res")
+        }
         getByName("test") { kotlin.srcDir("test") }
         getByName("universal") {
             kotlin.setSrcDirs(listOf("universal"))
@@ -68,7 +75,10 @@ android {
             jniLibs.setSrcDirs(listOf("runtime/jniLibs"))
             assets.setSrcDirs(listOf("runtime/assets"))
         }
-        getByName("controller") { kotlin.setSrcDirs(listOf("controller")) }
+        getByName("ui") {
+            manifest.srcFile("ui/AndroidManifest.xml")
+            kotlin.setSrcDirs(listOf("controller"))
+        }
         getByName("androidTest") { java.setSrcDirs(listOf("androidTest")) }
     }
     packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/lib*.so" } }
@@ -105,6 +115,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20250107")
+    androidTestImplementation("androidx.test:core:1.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:rules:1.6.1")

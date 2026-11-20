@@ -1,0 +1,10 @@
+/* The interface carries the visual language without naming it. */
+.mark{position:relative!important;width:22px!important;height:22px!important;display:grid!important;grid-template-columns:1fr 1fr!important;grid-template-rows:1fr 1fr!important;gap:6px!important;font-size:0!important;letter-spacing:0!important}
+.mark i{display:block!important;width:8px!important;height:8px!important;padding:0!important;border:0 solid var(--ink)!important;opacity:.94!important}
+.mark i:nth-child(1){border-left-width:2px!important;border-top-width:2px!important}.mark i:nth-child(2){border-right-width:2px!important;border-top-width:2px!important}.mark i:nth-child(3){border-left-width:2px!important;border-bottom-width:2px!important}.mark i:nth-child(4){border-right-width:2px!important;border-bottom-width:2px!important}
+.mark b{position:absolute;left:9px;top:9px;width:4px;height:4px;border-radius:1px;background:var(--accent)}
+.cloud-caption,.design-note,.page-intro,#backend-label,#components-label,.empty-state p,.empty-state small{display:none!important}
+.status-detail:empty{display:none}.footer-note{justify-content:flex-end}.footer-note #version-label{margin-left:0}.source-card{padding:18px 0 24px}.empty-state{min-height:132px;padding:42px 0;display:grid;place-items:center}.empty-state>span{font-size:30px;opacity:.72}
+.mode-info{width:38px;min-width:38px;height:38px;min-height:38px;padding:0;border:1px solid var(--line);border-radius:50%;font-size:16px;display:grid;place-items:center}
+button[data-token]{transition:transform .09s ease,opacity .09s ease}button[data-token]:active{transform:scale(.982)}
+#click-particles{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}

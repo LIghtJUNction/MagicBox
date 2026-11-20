@@ -7,7 +7,7 @@ This is a restart preview, not a claim of completed physical-device acceptance.
 | Flavor | Application ID | Runtime |
 | --- | --- | --- |
 | universal | com.github.lightjunction.magicbox | bundled pinned sing-box fork, Proxylink adapter, read-only eBPF attachment checker |
-| controller | com.github.lightjunction.magicbox.ui | mandatory root and an enabled compatible MagicNet module; no native engines |
+| ui | com.github.lightjunction.magicbox.ui | mandatory root and an enabled compatible MagicNet module; no native engines |
 
 Both packages can be installed at once. Do not run two root dataplanes simultaneously. Standalone root modes refuse to compete with an enabled MagicNet module. The UI distribution does not claim a system-only mode unsupported by MagicNet; use the universal local proxy for that mode.
 
@@ -39,3 +39,5 @@ Warm paper, restrained ink and one terracotta accent; native scalable text, gene
 CI must build both flavors, run unit tests, verify package IDs and absence/presence of native proxy components, and capture actual Android screens. A source/browser illustration is not a native screenshot. The release must clearly identify debug-signed test packages; unsigned files must never be presented as installable. A stable release additionally needs real Android root tests: denied/granted root, missing/disabled module, subscription failures, core exit, stop/crash/reboot cleanup, IPv4/IPv6/DNS routing, TUN and eBPF attachments, SELinux enforcing, and coexistence with other VPNs.
 
 No physical-device throughput, frame-time, battery or memory figures should be claimed without measurement. This design removes idle animation work; it does not itself prove 60/120fps on every phone.
+
+The Gradle flavor remains `ui`; `app/controller/` contains its native Compose platform adapter. Token Cloud produces `android-validation` and `android-device-evidence` for the existing Alpha promotion flow. Promotion requires exact source and APK identity, both theme checks, and the standalone native routing test; a source merge is not a release.

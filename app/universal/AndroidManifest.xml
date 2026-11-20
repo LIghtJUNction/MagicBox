@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <application android:extractNativeLibs="true" android:usesCleartextTraffic="true">
+    <application android:extractNativeLibs="true">
         <service android:name=".reboot.ProxyRuntimeService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started local proxy and root network routing; continuous connection with visible stop action" />
         </service>

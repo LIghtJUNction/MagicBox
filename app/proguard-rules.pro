@@ -1,1 +1,3 @@
-# MagicBox currently has no custom shrinker rules.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}

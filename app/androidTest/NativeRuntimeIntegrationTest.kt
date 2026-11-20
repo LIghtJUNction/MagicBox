@@ -3,6 +3,7 @@ package com.github.lightjunction.magicbox
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.lightjunction.magicbox.reboot.*
+import com.github.lightjunction.magicbox.reboot.CloudActivity
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket

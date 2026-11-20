@@ -7,7 +7,7 @@
 | 版本 | 包名 | 依赖 |
 | --- | --- | --- |
 | 通用版 `universal` | `com.github.lightjunction.magicbox` | 内置代理内核、订阅解析器与 eBPF 检查组件；不依赖 MagicNet |
-| 仅 UI 版 `controller` | `com.github.lightjunction.magicbox.ui` | 必须授予 root，并安装启用兼容的 MagicNet；不包含代理内核 |
+| 仅 UI 版 `ui` | `com.github.lightjunction.magicbox.ui` | 必须授予 root，并安装启用兼容的 MagicNet；不包含代理内核 |
 
 Android 8.0 及以上。通用预览包包含 ARM64 与 x86_64 两种架构。两个包可共存，但不要同时运行两套 root 透明代理；通用版会拒绝与已启用的 MagicNet 争抢路由。
 
@@ -37,15 +37,19 @@ Android 8.0 及以上。通用预览包包含 ARM64 与 x86_64 两种架构。�
 
 ## 构建与验收
 
-依赖版本记录在 [`runtime.lock.json`](runtime.lock.json)，通过 MagicNet 自身的构建脚本编译。运行 **Actions → MagicBox reboot verification**：原生组件 → 双包构建与单元测试 → 签名/包名/组件隔离检查 → Android 模拟器截图与实际本地转发测试。
+依赖版本记录在 [`runtime.lock.json`](runtime.lock.json)，通过 MagicNet 自身的构建脚本编译。运行 **Actions → Token Cloud**：原生组件 → 双包构建与单元测试 → 签名/包名/组件隔离检查 → Android 模拟器截图与实际本地转发测试。
 
-已有构建产物时，将两个 Android runtime 产物分别放到 `app/runtime/jniLibs/<abi>/`，再运行：
+仅 UI 版可以直接运行 `./gradlew :app:testUiDebugUnitTest :app:assembleUiDebug`。通用版先构建固定的原生依赖，再用 `python3 scripts/stage-runtime.py --input runtime-input` 校验和放置组件，随后运行：
 
 ```bash
-./gradlew :app:assembleUniversalDebug :app:assembleControllerDebug
+./gradlew :app:assembleUniversalDebug :app:assembleUiDebug
 ```
 
 预览 APK 使用测试签名，不等于生产发布签名。若与已安装旧包的签名不同，不能直接覆盖安装；请先确认订阅已有备份。不要分发 keystore 或把未签名 APK 当作可安装版本。
+
+构建保留 `universal` / `ui` flavor 和现有包名。`app/controller/` 是 UI 版的平台适配源码目录，不能据此把 Gradle flavor 改成 `controller`。
+
+Alpha 发布继续使用 [Release workflow](.github/workflows/release.yml)：指定成功的 Token Cloud push 运行和已审阅的完整提交 SHA，核验源码归档、APK 签名及摘要、两版安装和截图、原生转发测试，再提升同一份已测试 APK。发布阶段不重新编译或签名。普通合并不等于正式发布或实机验收完成。
 
 完整边界与实机验收清单见 [`docs/REBOOT.md`](docs/REBOOT.md)。模拟器测试不替代 KernelSU/Magisk/APatch 实机的 root、IPv6/DNS、SELinux、耗电和路由恢复测试。
 
