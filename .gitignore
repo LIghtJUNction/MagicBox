@@ -86,3 +86,18 @@ Thumbs.db
 .agents
 .codex
 .trellis
+
+# Reboot runtime and local acceptance artifacts
+/app/runtime/
+/runtime-input/
+/visual/
+/delivery/
+/evidence/
+/validated/
+__pycache__/
+
+# Generated acceptance archives stay outside Git.
+/validated-*/
+/runtime-input-*/
+/artifacts/
+/dist/

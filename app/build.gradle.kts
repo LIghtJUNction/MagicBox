@@ -3,15 +3,12 @@ plugins {
     kotlin("android")
     kotlin("plugin.compose")
 }
-val releaseKeystoreFile = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
-val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
-val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
-val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
-val releaseSigningValues = listOf(releaseKeystoreFile, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword)
-val hasReleaseSigning = releaseSigningValues.all { !it.isNullOrBlank() }
-if (releaseSigningValues.any { !it.isNullOrBlank() } && !hasReleaseSigning) {
-    error("Release signing requires all four ANDROID_KEYSTORE_FILE/PASSWORD and ANDROID_KEY_ALIAS/PASSWORD values.")
-}
+
+val signingValues = listOf("ANDROID_KEYSTORE_FILE", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD")
+    .map { providers.environmentVariable(it).orNull }
+val hasReleaseSigning = signingValues.all { !it.isNullOrBlank() }
+if (signingValues.any { !it.isNullOrBlank() } && !hasReleaseSigning) error("Incomplete Android release signing configuration")
+
 android {
     namespace = providers.gradleProperty("project.namespace.base").get()
     compileSdk = providers.gradleProperty("android.compileSdk").map(String::toInt).get()
@@ -20,15 +17,16 @@ android {
         applicationId = providers.gradleProperty("project.namespace.base").get()
         minSdk = providers.gradleProperty("android.minSdk").map(String::toInt).get()
         targetSdk = providers.gradleProperty("android.targetSdk").map(String::toInt).get()
-        versionCode = providers.gradleProperty("project.version.code").map(String::toInt).get()
+        versionCode = providers.gradleProperty("project.version.code").get().toInt()
         versionName = providers.gradleProperty("project.version.name").get()
-        manifestPlaceholders["appName"] = providers.gradleProperty("project.name").get()
+        manifestPlaceholders["appName"] = "MagicBox"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     flavorDimensions += "edition"
     productFlavors {
         create("universal") {
             dimension = "edition"
+            buildConfigField("boolean", "UI_ONLY", "false")
             buildConfigField("boolean", "STANDALONE", "true")
             manifestPlaceholders["appName"] = "MagicBox"
             ndk { abiFilters += setOf("arm64-v8a", "x86_64") }
@@ -36,11 +34,11 @@ android {
         create("ui") {
             dimension = "edition"
             applicationIdSuffix = ".ui"
+            buildConfigField("boolean", "UI_ONLY", "true")
             buildConfigField("boolean", "STANDALONE", "false")
             manifestPlaceholders["appName"] = "MagicBox UI"
         }
     }
-    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/*.so" } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -48,13 +46,11 @@ android {
     }
     buildFeatures { buildConfig = true; compose = true }
     signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = file(releaseKeystoreFile!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
-            }
+        if (hasReleaseSigning) create("release") {
+            storeFile = file(signingValues[0]!!)
+            storePassword = signingValues[1]
+            keyAlias = signingValues[2]
+            keyPassword = signingValues[3]
         }
     }
     buildTypes {
@@ -72,30 +68,60 @@ android {
             assets.srcDir("assets")
             res.srcDir("res")
         }
-        getByName("universal") {
-            manifest.srcFile("universal/AndroidManifest.xml")
-            jniLibs.srcDir("universal/jniLibs")
-            assets.srcDir("universal/assets")
-        }
-        getByName("ui") { manifest.srcFile("ui/AndroidManifest.xml") }
         getByName("test") { kotlin.srcDir("test") }
-        getByName("androidTest") { kotlin.srcDir("instrumentation") }
+        getByName("universal") {
+            kotlin.setSrcDirs(listOf("universal"))
+            manifest.srcFile("universal/AndroidManifest.xml")
+            jniLibs.setSrcDirs(listOf("runtime/jniLibs"))
+            assets.setSrcDirs(listOf("runtime/assets"))
+        }
+        getByName("ui") {
+            manifest.srcFile("ui/AndroidManifest.xml")
+            kotlin.setSrcDirs(listOf("controller"))
+        }
+        getByName("androidTest") { java.setSrcDirs(listOf("androidTest")) }
     }
+    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/lib*.so" } }
+    lint { abortOnError = true }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+
+tasks.register("verifyBundledRuntime") {
+    doLast {
+        for (abi in listOf("arm64-v8a", "x86_64")) {
+            for (library in listOf("libsingbox.so", "libproxylink.so", "libebpfcheck.so")) {
+                val binary = file("runtime/jniLibs/$abi/$library")
+                check(binary.isFile && binary.length() > 1024) { "Missing pinned runtime: $binary. Run Pinned proxy runtime first." }
+                binary.inputStream().use { stream ->
+                    check(stream.readNBytes(4).contentEquals(byteArrayOf(0x7f, 0x45, 0x4c, 0x46))) { "Runtime is not ELF: $binary" }
+                }
+            }
+        }
+    }
+}
+tasks.configureEach {
+    if (name == "preUniversalDebugBuild" || name == "preUniversalReleaseBuild") dependsOn("verifyBundledRuntime")
+}
+
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
+    implementation("androidx.compose.animation:animation-core")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
     testImplementation("org.json:json:20250107")
-    androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

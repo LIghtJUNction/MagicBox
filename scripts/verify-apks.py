@@ -9,7 +9,7 @@ import zipfile
 
 ABIS = {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"}
 RUNTIME_ABIS = {"arm64-v8a", "x86_64"}
-RUNTIME_LIBS = {"libsingbox.so", "libproxylink.so", "libmbprobe.so"}
+RUNTIME_LIBS = {"libsingbox.so", "libproxylink.so", "libebpfcheck.so"}
 # Compose uses this renderer even when no proxy runtime is packaged.
 UI_LIBS = {"libandroidx.graphics.path.so"}
 
@@ -57,6 +57,8 @@ def verify():
             if edition == "ui" and any(n.startswith("assets/components/") for n in names):
                 raise ValueError("UI edition must not contain standalone runtime assets")
             if edition == "universal":
+                if archive.read("assets/runtime.lock.json") != Path("runtime.lock.json").read_bytes():
+                    raise ValueError("Packaged runtime lock differs from the reviewed source")
                 checksums = archive.read("assets/components/SHA256SUMS").decode().splitlines()
                 checked = set()
                 for entry in checksums:

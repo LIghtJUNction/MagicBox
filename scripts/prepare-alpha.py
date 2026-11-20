@@ -17,6 +17,12 @@ def single(root: Path, name: str) -> Path:
     return matches[0]
 
 
+def passed(root: Path, name: str):
+    tests = single(root, name).read_text()
+    if not re.search(r"OK \([1-9][0-9]* tests?\)", tests) or re.search(r"FAILURES|INSTRUMENTATION_FAILED|Process crashed", tests):
+        raise ValueError(f"Device acceptance did not pass: {name}")
+
+
 def prepare(validated: Path, device: Path, output: Path, sha: str, tag: str) -> dict:
     if not re.fullmatch(r"[0-9a-f]{40}", sha) or not re.fullmatch(r"v\d+\.\d+\.\d+-alpha\.\d+", tag):
         raise ValueError("Invalid immutable SHA or Alpha version")
@@ -38,19 +44,27 @@ def prepare(validated: Path, device: Path, output: Path, sha: str, tag: str) -> 
         apk = single(validated, f"app-{edition}-debug.apk")
         if apk.stat().st_size != row["bytes"] or hashlib.sha256(apk.read_bytes()).hexdigest() != row["sha256"]:
             raise ValueError("APK bytes differ from the verified artifact")
-        tests = single(device, f"{edition}-tests.txt").read_text()
-        if not re.search(r"OK \([1-9][0-9]* tests?\)", tests) or re.search(r"FAILURES|INSTRUMENTATION_FAILED|Process crashed", tests):
-            raise ValueError(f"{edition} did not pass device acceptance")
+        passed(device, f"{edition}-tests.txt")
         # Evidence is captured from the installed app, not generated artwork.
-        if not list(device.glob(f"{edition}/**/home-light.png")):
-            raise ValueError(f"Missing installed-app visual evidence: {edition}")
+        for theme in ("light", "dark"):
+            passed(device, f"{edition}-{theme}-tests.txt")
+            if not list(device.glob(f"{edition}/**/home-{theme}.png")):
+                raise ValueError(f"Missing installed-app visual evidence: {edition}/{theme}")
         staged.append((apk, output / f"MagicBox-{tag}-{edition}-test.apk"))
+    passed(device, "native-runtime-tests.txt")
+    proof = single(device, "native-routing-proof.txt").read_text()
+    if not proof.startswith("PASS: installed Android parser"):
+        raise ValueError("Missing installed native routing proof")
+    packages = single(device, "coinstalled-packages.txt").read_text().splitlines()
+    if len(packages) != 2 or set(packages) != {f"package:{package}" for package in PACKAGES.values()}:
+        raise ValueError("The two verified package IDs were not installed together")
     output.mkdir(parents=True, exist_ok=False)
     for source_apk, destination in staged:
         shutil.copy2(source_apk, destination)
     shutil.copy2(source, output / f"MagicBox-{tag}-source.zip")
     report = {"commit": sha, "tag": tag, "editions": rows, "signing": "CI debug/test signing",
-              "android_emulator": 35, "rooted_physical_device_verified": False}
+              "android_emulator": 35, "themes": ["light", "dark"], "native_runtime_verified": True,
+              "rooted_physical_device_verified": False}
     (output / "validation.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 

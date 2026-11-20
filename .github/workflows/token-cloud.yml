@@ -1,5 +1,6 @@
 name: Token Cloud
 on:
+  workflow_call:
   push:
     branches: [main]
   pull_request:
@@ -12,83 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   native:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: LIghtJUNction/MagicNet
-          ref: a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd
-          path: dependencies/MagicNet
-          persist-credentials: false
-      - run: git -C dependencies/MagicNet submodule update --init --recursive sing-box
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Fanju6/Proxylink
-          ref: 44929c0984944870297c260dc43a4aa9262f9e1c
-          path: dependencies/Proxylink
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          # Proxylink requires Go 1.26; use one toolchain for both Go modules.
-          go-version: '1.26.x'
-          cache-dependency-path: |
-            dependencies/MagicNet/sing-box/go.sum
-            dependencies/Proxylink/Proxylink/go.sum
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: native-cache
-        with:
-          path: native-output
-          key: magicbox-native-v2-go126-a94682e4-44929c09
-      - name: Build exact shared core
-        if: steps.native-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p native-output/arm64-v8a native-output/x86_64 native-output/licenses
-          bash dependencies/MagicNet/scripts/build-sing-box.sh android arm64 "$PWD/native-output/arm64-v8a/libsingbox.so"
-          bash dependencies/MagicNet/scripts/build-sing-box.sh android amd64 "$PWD/native-output/x86_64/libsingbox.so"
-      - name: Test and build shared runtime adapters
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p native-output/licenses evidence
-          mkdir -p dependencies/Proxylink/Proxylink/cmd/magicbox
-          cp native/importer/*.go dependencies/Proxylink/Proxylink/cmd/magicbox/
-          (cd dependencies/Proxylink/Proxylink && go test -json ./cmd/magicbox) | tee evidence/importer-tests.json
-          cargo test --manifest-path native/runtime/Cargo.toml 2>&1 | tee evidence/runtime-tests.txt
-          rustup target add aarch64-linux-android x86_64-linux-android
-          ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
-          if [[ -z "$ndk" ]]; then ndk=$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1); fi
-          toolchain="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          test -x "$toolchain/aarch64-linux-android26-clang"
-          for entry in arm64-v8a:arm64:aarch64-linux-android x86_64:amd64:x86_64-linux-android; do
-            IFS=: read -r abi arch target <<< "$entry"
-            cc="$toolchain/${target}26-clang"
-            (cd dependencies/Proxylink/Proxylink && CGO_ENABLED=1 GOOS=android GOARCH="$arch" CC="$cc" go build -mod=readonly -trimpath -buildmode=pie -ldflags='-s -w -buildid=' -o "$GITHUB_WORKSPACE/native-output/$abi/libproxylink.so" ./cmd/magicbox)
-            export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$toolchain/aarch64-linux-android26-clang"
-            export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$toolchain/x86_64-linux-android26-clang"
-            RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384' cargo build --release --manifest-path native/runtime/Cargo.toml --target "$target"
-            cp "native/runtime/target/$target/release/magicbox-runtime" "native-output/$abi/libmbprobe.so"
-          done
-          cp dependencies/MagicNet/LICENSE native-output/licenses/MagicNet.txt
-          cp dependencies/MagicNet/sing-box/LICENSE native-output/licenses/sing-box.txt
-          cp dependencies/Proxylink/LICENSE native-output/licenses/Proxylink.txt
-          cp LICENSE native-output/licenses/MagicBox.txt
-          git -C dependencies/MagicNet/sing-box rev-parse HEAD > native-output/sing-box.commit
-          printf 'MagicNet=a94682e4a4d2c187b3f2ad7e0107f7d1ad4323cd\nProxylink=44929c0984944870297c260dc43a4aa9262f9e1c\nMagicBox=%s\n' "$GITHUB_SHA" > native-output/provenance.txt
-          (cd native-output && sha256sum */*.so > SHA256SUMS)
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shared-native-components
-          path: native-output/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: native-evidence
-          path: |
-            evidence/
-            native/runtime/Cargo.lock
+    uses: ./.github/workflows/runtime.yml
   validate:
     needs: native
     runs-on: ubuntu-latest
@@ -97,13 +22,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: shared-native-components
-          path: native-output
-      - name: Stage universal-only components
+          pattern: runtime-*
+          path: runtime-input
+      - name: Validate and stage universal-only components
+        run: python3 scripts/stage-runtime.py --input runtime-input
+      - name: Offline native integration
+        shell: bash
         run: |
-          mkdir -p app/universal/jniLibs app/universal/assets/components
-          cp -R native-output/arm64-v8a native-output/x86_64 app/universal/jniLibs/
-          cp -R native-output/licenses native-output/provenance.txt native-output/SHA256SUMS app/universal/assets/components/
+          set -euo pipefail
+          mkdir -p evidence
+          chmod +x runtime-input/runtime-linux-x86_64/*.so
+          python3 scripts/test_runtime.py --runtime-dir runtime-input/runtime-linux-x86_64 2>&1 | tee evidence/native-tests.log
+      - name: Check APK and promotion contracts
+        run: |
+          python3 -m unittest scripts/test_verify_apks.py scripts/test_stage_runtime.py
+          python3 scripts/test-prepare-alpha.py
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
@@ -156,7 +89,7 @@ jobs:
           profile: pixel_6
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash scripts/device-acceptance.sh
+          script: bash scripts/android_visual.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

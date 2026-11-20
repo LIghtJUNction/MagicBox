@@ -28,11 +28,17 @@ class PromotionTest(unittest.TestCase):
             content = f'synthetic-{edition}-apk'.encode()
             (self.validated / f'app-{edition}-debug.apk').write_bytes(content)
             (self.device / f'{edition}-tests.txt').write_text('OK (3 tests)\n')
+            for theme in ('light', 'dark'):
+                (self.device / f'{edition}-{theme}-tests.txt').write_text('OK (1 test)\n')
             images = self.device / edition / 'evidence'
             images.mkdir(parents=True)
             (images / 'home-light.png').write_bytes(b'synthetic screenshot')
+            (images / 'home-dark.png').write_bytes(b'synthetic screenshot')
             rows.append(dict(edition=edition, package=package, bytes=len(content), sha256=hashlib.sha256(content).hexdigest()))
         (self.validated / 'apk-verification.json').write_text(json.dumps(rows))
+        (self.device / 'native-runtime-tests.txt').write_text('OK (1 test)\n')
+        (self.device / 'native-routing-proof.txt').write_text('PASS: installed Android parser, synthetic unit-test fixture\n')
+        (self.device / 'coinstalled-packages.txt').write_text(''.join(f'package:{p}\n' for p in alpha.PACKAGES.values()))
     def promote(self):
         return alpha.prepare(self.validated, self.device, self.root / 'release', self.sha, self.tag)
     def test_exact_bytes_promoted(self):
@@ -63,6 +69,21 @@ class PromotionTest(unittest.TestCase):
         with self.assertRaises(ValueError): self.promote()
     def test_reject_version_mismatch(self):
         self.tag='v0.2.0-alpha.2'
+        with self.assertRaises(ValueError): self.promote()
+    def test_reject_missing_native_test(self):
+        (self.device/'native-runtime-tests.txt').unlink()
+        with self.assertRaises(ValueError): self.promote()
+    def test_reject_failed_native_test_even_with_ok_summary(self):
+        (self.device/'native-runtime-tests.txt').write_text('Process crashed\nOK (1 test)')
+        with self.assertRaises(ValueError): self.promote()
+    def test_reject_failed_dark_theme(self):
+        (self.device/'ui-dark-tests.txt').write_text('FAILURES\nOK (1 test)')
+        with self.assertRaises(ValueError): self.promote()
+    def test_reject_missing_native_proof(self):
+        (self.device/'native-routing-proof.txt').write_text('not a successful routing test')
+        with self.assertRaises(ValueError): self.promote()
+    def test_reject_wrong_coinstalled_package(self):
+        (self.device/'coinstalled-packages.txt').write_text('package:unrelated\n')
         with self.assertRaises(ValueError): self.promote()
 
 if __name__ == '__main__': unittest.main()
