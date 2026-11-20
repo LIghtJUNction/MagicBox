@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Exercise the installed Compose UI and native runtime from the same validated APKs.
 set -euo pipefail
+# The acceptance flow clears fixture data; never run it on a physical device.
+serial=$(adb get-serialno)
+if [[ ! "$serial" =~ ^emulator-[0-9]+$ ]]; then
+  echo 'Acceptance requires an isolated Android emulator.' >&2
+  exit 1
+fi
+export ANDROID_SERIAL="$serial"
+test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 evidence=evidence/device
 mkdir -p "$evidence"
 apk_path() {
