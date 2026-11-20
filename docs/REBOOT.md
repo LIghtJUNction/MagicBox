@@ -1,43 +1,39 @@
-# MagicBox · Token 云集合 / 0.2.0-alpha.1
+# MagicBox implementation and validation
 
-This is a restart preview, not a claim of completed physical-device acceptance.
+## Runtime
 
-## Two distributions
+`universal` bundles the fixed sing-box fork, a Proxylink adapter and a read-only eBPF attachment checker. `ui` controls an installed MagicNet module through its schema-1 machine interface and existing commands. It contains no proxy engines. Both target Android 8+; universal binaries cover arm64-v8a and x86_64.
 
-| Flavor | Application ID | Runtime |
+[`runtime.lock.json`](../runtime.lock.json) pins MagicNet, its sing-box gitlink and the Proxylink source used by its build hook. MagicBox provides Android process, configuration and UI adapters. The core build uses MagicNet's build script.
+
+| Mode | Readiness check | Scope |
 | --- | --- | --- |
-| universal | com.github.lightjunction.magicbox | bundled pinned sing-box fork, Proxylink adapter, read-only eBPF attachment checker |
-| ui | com.github.lightjunction.magicbox.ui | mandatory root and an enabled compatible MagicNet module; no native engines |
+| System proxy | Local core API and listener | Universal HTTP/SOCKS5 at `127.0.0.1:2080`; the user configures Wi-Fi or a proxy-aware app |
+| Root TUN | Core API and `magicbox0` interface | Exclusive root dataplane; the core owns route cleanup |
+| Root eBPF | Preflight and all six required cgroup hook types, bound to this core PID's BPF descriptors | Fork's local eBPF inbound; no standalone hotspot/shared TC support |
 
-Both packages can be installed at once. Do not run two root dataplanes simultaneously. Standalone root modes refuse to compete with an enabled MagicNet module. The UI distribution does not claim a system-only mode unsupported by MagicNet; use the universal local proxy for that mode.
+Failed or unknown readiness checks clear ready state. Standalone root modes refuse to compete with an enabled MagicNet module. UI mode does not expose a system proxy mode unsupported by the module.
 
-Universal is an independent distribution, not a promise of support for every CPU. This preview bundles Android arm64-v8a and x86_64. Android 8+ is required.
+## Subscriptions
 
-## Shared source, distinct platform adapters
+The Proxylink adapter accepts Clash/Mihomo YAML, sing-box JSON, Xray JSON, SIP008, share-URI collections and Base64. Executable adapters cover VLESS, VMess, Shadowsocks, Trojan, SOCKS, Hysteria2, AnyTLS and TUIC. Unsupported entries produce a counted rejection and preserve the previous subscription.
 
-`runtime.lock.json` pins MagicNet, its sing-box gitlink, and the exact Proxylink revision in MagicNet's build hook. The build reuses MagicNet's core build script. MagicBox does not carry a separate proxy protocol implementation. The controller validates the module's schema-1 machine interface and uses its existing private-payload subscription pipeline. Standalone process lifecycle and configuration assembly are Android host adapters, not a second network core.
+Inputs are limited to 8 MiB UTF-8 and 2000 nodes. Remote fetching requires HTTPS and bounds redirects. Imported content cannot replace local inbounds or global routing, or reference private local files. Profiles use atomic private storage with backups disabled. Subscription content, URLs and parser details stay out of logs. Controller imports pass through stdin into the module's private-payload flow.
 
-## Modes and honest status
+## Interface
 
-- System proxy: independent local HTTP/SOCKS5 on 127.0.0.1:2080. No root is required. The user must configure Wi-Fi or a proxy-aware app; this does NOT automatically cover cellular traffic or apps ignoring system proxy settings.
-- Root TUN: API plus magicbox0 interface proof is required before readiness is shown. Routing is exclusive to this runtime and the core owns cleanup.
-- Root eBPF: uses the actual fork's local eBPF inbound, not nftables renamed as eBPF. The preflight probe must succeed. A read-only helper checks all six required cgroup hook types against BPF descriptors held by this core PID. No hotspot/shared TC claim is made for the standalone adapter.
-- A running process is never sufficient evidence for a ready dataplane. Failed or unknown checks clear ready state.
+The connection page shows status, the selected node and the primary action. The other pages contain subscriptions and settings. Light and dark themes use neutral backgrounds and one blue accent. Touch targets are at least 48dp.
 
-## Subscription support and boundaries
+The small header mark and primary buttons retain the bounded token effect. Geometry is precomputed, with at most 112 glyphs and no idle animation clock. Reduced motion, system animation settings, battery saver and backgrounding suppress it. Horizontal gestures leave vertical page scrolling available. Actions execute independently of animation.
 
-The local adapter uses Proxylink ConvertContent and generators: Clash/Mihomo YAML, sing-box JSON, Xray JSON, SIP008, share-URI collections and Base64. Executable node adapters currently include VLESS, VMess, Shadowsocks, Trojan, SOCKS, Hysteria2, AnyTLS and TUIC. Parse success is distinct from generator and core compatibility. Unsupported entries cause an explicit counted rejection and leave the previous subscription intact. Unknown/proprietary formats, Surge, Quantumult X and unverified protocol options are NOT advertised as universally supported.
+## Build and validation
 
-Files are bounded to 8 MiB UTF-8 and 2000 nodes. Remote fetching is HTTPS-only with bounded redirects. Imports never adopt subscription-supplied inbounds, global routing or local file references. Profiles use private atomic storage; backups are disabled. Files, subscription URLs and parser errors are not placed in logs. The native converter prints only safe diagnostic categories. Controller payload content enters the privileged wrapper through stdin and is removed by the module's private-payload flow.
+The Gradle flavors are `universal` and `ui`. `app/controller/` is the UI flavor's platform adapter directory. Use JDK 21 and Android SDK 35 for the Android build. The runtime workflow records native source revisions, toolchain versions, licenses and checksums; `stage-runtime.py` verifies them before copying binaries.
 
-## Token cloud design
+The [Token Cloud workflow](../.github/workflows/token-cloud.yml) builds both flavors, runs unit tests and verifies signatures, package IDs and native-component isolation. `scripts/android_visual.sh` captures real Android screens for both flavors in both themes, checks interaction and reduced motion, and exercises native import, two-hop local forwarding and shutdown. It targets an explicitly selected emulator; physical-device acceptance is a separate procedure.
 
-Warm paper, restrained ink and one terracotta accent; native scalable text, generous whitespace, no glass blur or continuous ambient animation. Tap dissolves the entire filled surface into a bounded field of token glyphs and settles it again. Horizontal drag scatters it without stealing normal vertical scrolling. There are at most 112 glyphs, precomputed geometry and one reused Paint per surface. Animation values are read during drawing rather than rebuilding the page every frame. Actions execute once independently of animation. System disabled animations, battery saver, backgrounding and the reduced-motion preference suppress the effect. Main controls have at least 48dp touch targets.
+These checks establish emulator behavior for the exact tested source and APKs. Root-device acceptance still covers granted/denied root, missing or disabled modules, failed imports, core exits, stop/crash/reboot cleanup, IPv4/IPv6/DNS, actual TUN/eBPF attachments, SELinux enforcing and VPN coexistence. Throughput, frame time and battery figures require measurements on the stated device.
 
-## Release gate
+## Alpha promotion
 
-CI must build both flavors, run unit tests, verify package IDs and absence/presence of native proxy components, and capture actual Android screens. A source/browser illustration is not a native screenshot. The release must clearly identify debug-signed test packages; unsigned files must never be presented as installable. A stable release additionally needs real Android root tests: denied/granted root, missing/disabled module, subscription failures, core exit, stop/crash/reboot cleanup, IPv4/IPv6/DNS routing, TUN and eBPF attachments, SELinux enforcing, and coexistence with other VPNs.
-
-No physical-device throughput, frame-time, battery or memory figures should be claimed without measurement. This design removes idle animation work; it does not itself prove 60/120fps on every phone.
-
-The Gradle flavor remains `ui`; `app/controller/` contains its native Compose platform adapter. Token Cloud produces `android-validation` and `android-device-evidence` for the existing Alpha promotion flow. Promotion requires exact source and APK identity, both theme checks, and the standalone native routing test; a source merge is not a release.
+The [Release workflow](../.github/workflows/release.yml) consumes a successful Token Cloud push run and an approved full source SHA. It verifies the source archive, both APK identities and signatures, theme screenshots and native routing proof, then promotes those same APKs without rebuilding or resigning. Preview packages use test signing. A source merge alone does not publish an Alpha or complete root-device acceptance.

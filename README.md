@@ -1,58 +1,50 @@
-# MagicBox · Token 云集合
+# MagicBox
 
-面向日常使用的原生 Android 代理界面，与 [MagicNet](https://github.com/LIghtJUNction/MagicNet) 共用固定版本的 sing-box 内核和订阅解析器。
+Android 代理客户端，与 [MagicNet](https://github.com/LIghtJUNction/MagicNet) 使用相同的固定版本内核和订阅解析器。支持 Android 8.0 及以上。
 
-## 两个可以同时安装的版本
+## 选择版本
 
-| 版本 | 包名 | 依赖 |
+| 版本 | 包名 | 使用条件 |
 | --- | --- | --- |
-| 通用版 `universal` | `com.github.lightjunction.magicbox` | 内置代理内核、订阅解析器与 eBPF 检查组件；不依赖 MagicNet |
-| 仅 UI 版 `ui` | `com.github.lightjunction.magicbox.ui` | 必须授予 root，并安装启用兼容的 MagicNet；不包含代理内核 |
+| 通用版 `universal` | `com.github.lightjunction.magicbox` | 内置内核，支持 ARM64、x86_64 |
+| UI 版 `ui` | `com.github.lightjunction.magicbox.ui` | 需要 root 和已启用的兼容 MagicNet 模块；不含内核 |
 
-Android 8.0 及以上。通用预览包包含 ARM64 与 x86_64 两种架构。两个包可共存，但不要同时运行两套 root 透明代理；通用版会拒绝与已启用的 MagicNet 争抢路由。
+两个版本可以同时安装。运行 root 代理时只启用一套：通用版会拒绝与已启用的 MagicNet 争用路由。
 
-## 连接方式
+## 使用
 
-**系统代理**：通用版在 `127.0.0.1:2080` 提供 HTTP/SOCKS5。无需 root，但需要在 Wi-Fi 或支持代理的应用中手动配置。它不等于全局 VPN，不会自动接管蜂窝网络或忽略系统代理的应用。
+1. 在「订阅」粘贴 HTTPS 链接或订阅内容，也可以导入文件。
+2. 选择节点，在「连接」选择模式并连接。UI 版首次使用需要授予模块权限。
+3. 使用本地系统代理时，在 Wi-Fi 或应用中填写 `127.0.0.1:2080`。
 
-**TUN**：需要 root。只有内核 API 与 TUN 接口都就绪，才显示连接成功。
+| 模式 | 条件与范围 |
+| --- | --- |
+| 系统代理 | 通用版，无需 root；提供本地 HTTP/SOCKS5，需要手动配置，不自动接管全部流量 |
+| TUN | 需要 root；内核 API 与 TUN 接口均就绪后才显示已连接 |
+| eBPF | 需要 root 和兼容内核；检查本进程的实际挂载，失败时停止，不回退到 TUN |
 
-**eBPF**：使用 MagicNet 的 sing-box 分支提供的真实 eBPF 入站。需要 root 与兼容内核；能力检查和本进程挂载检查失败时不会伪装成功，也不会暗中回退成 TUN。通用版目前采用 local 模式，不宣称支持热点共享接管。
+通用版 eBPF 使用 local 模式。UI 版通过 MagicNet 现有接口控制 TUN/eBPF。
 
-仅 UI 版通过 MagicNet 的机器接口读取状态，通过模块现有命令控制 TUN/eBPF，不另行启动一套内核。
+订阅入口支持 Clash/Mihomo YAML、sing-box JSON、Xray JSON、SIP008、节点 URI 和 Base64；可用协议包括 VLESS、VMess、Shadowsocks、Trojan、SOCKS、Hysteria2、AnyTLS、TUIC。未知格式或不能转换的节点会报错，并保留原订阅。文件上限为 8 MiB UTF-8、2000 个节点；解析在本机完成。
 
-## Token 云集合
+界面跟随系统明暗主题。「设置」可减少动态效果；系统关闭动画、节电或应用进入后台时也会停用动效。
 
-暖纸色、深墨色与少量陶土色；支持随系统切换明暗主题。按钮点击后整体消解成字符，再汇聚固化。横向拖动会打散 token，松手后归位，不抢占页面的纵向滚动。
+## 构建
 
-不使用玻璃模糊或常驻粒子循环。几何参数预计算，单个表面最多 112 个字符；静止时没有动画帧时钟。支持减少动态效果，并响应系统动画关闭、节电与应用退到后台。
-
-## 订阅
-
-支持 HTTPS 地址、文本粘贴与本地文件。当前格式入口：Clash/Mihomo YAML、sing-box JSON、Xray JSON、SIP008、节点 URI 集合及 Base64。
-
-可执行节点适配包括 VLESS、VMess、Shadowsocks、Trojan、SOCKS、Hysteria2、AnyTLS、TUIC。**不声称任意私有格式都可解析**：未知协议或不能转换的节点会明确报错，旧订阅保持不变。Surge、Quantumult X 等未验证格式不列入支持清单。
-
-最多 8 MiB UTF-8 文本、2000 个节点。配置在本机转换和验证，不交给第三方转换网站；订阅不能覆盖本地入站、全局路由或引用本地私密文件。
-
-## 构建与验收
-
-依赖版本记录在 [`runtime.lock.json`](runtime.lock.json)，通过 MagicNet 自身的构建脚本编译。运行 **Actions → Token Cloud**：原生组件 → 双包构建与单元测试 → 签名/包名/组件隔离检查 → Android 模拟器截图与实际本地转发测试。
-
-仅 UI 版可以直接运行 `./gradlew :app:testUiDebugUnitTest :app:assembleUiDebug`。通用版先构建固定的原生依赖，再用 `python3 scripts/stage-runtime.py --input runtime-input` 校验和放置组件，随后运行：
+需要 JDK 21、Android SDK 35。原生组件版本见 [`runtime.lock.json`](runtime.lock.json)，构建步骤见 [runtime workflow](.github/workflows/runtime.yml)。先构建固定依赖，再校验并放置组件：
 
 ```bash
-./gradlew :app:assembleUniversalDebug :app:assembleUiDebug
+python3 scripts/stage-runtime.py --input runtime-input
+./gradlew :app:testUniversalDebugUnitTest :app:testUiDebugUnitTest \
+  :app:assembleUniversalDebug :app:assembleUiDebug
 ```
 
-预览 APK 使用测试签名，不等于生产发布签名。若与已安装旧包的签名不同，不能直接覆盖安装；请先确认订阅已有备份。不要分发 keystore 或把未签名 APK 当作可安装版本。
+仅构建 UI 版可以省略原生组件步骤，执行 `./gradlew :app:testUiDebugUnitTest :app:assembleUiDebug`。
 
-构建保留 `universal` / `ui` flavor 和现有包名。`app/controller/` 是 UI 版的平台适配源码目录，不能据此把 Gradle flavor 改成 `controller`。
+预览 APK 使用测试签名。与旧包签名不同时无法覆盖安装，卸载前请备份订阅。Alpha 通过 [Release workflow](.github/workflows/release.yml) 提升已验收的同一份 APK，发布时不重新编译或签名。源码合并不代表已发布。
 
-Alpha 发布继续使用 [Release workflow](.github/workflows/release.yml)：指定成功的 Token Cloud push 运行和已审阅的完整提交 SHA，核验源码归档、APK 签名及摘要、两版安装和截图、原生转发测试，再提升同一份已测试 APK。发布阶段不重新编译或签名。普通合并不等于正式发布或实机验收完成。
-
-完整边界与实机验收清单见 [`docs/REBOOT.md`](docs/REBOOT.md)。模拟器测试不替代 KernelSU/Magisk/APatch 实机的 root、IPv6/DNS、SELinux、耗电和路由恢复测试。
+实现、验收步骤及 root 实机待测项见 [`docs/REBOOT.md`](docs/REBOOT.md)。
 
 ## 许可
 
-MagicBox：AGPL-3.0-or-later。内核、解析器的版本、源码和许可证随原生产物提供。旧界面来源说明保留在 [`NOTICE.md`](NOTICE.md) 与 [`docs/ThirdParty.md`](docs/ThirdParty.md)。
+MagicBox 使用 AGPL-3.0-or-later。内核和解析器的固定版本、源码与许可证随构建产物提供；来源说明见 [`NOTICE.md`](NOTICE.md) 和 [`docs/ThirdParty.md`](docs/ThirdParty.md)。

@@ -24,6 +24,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +44,7 @@ import kotlinx.coroutines.Dispatchers
 
 internal data class CloudColors(val paper: Color, val ink: Color, val muted: Color, val line: Color, val accent: Color)
 internal val LocalCloud = staticCompositionLocalOf {
-    CloudColors(Color(0xFFF6F5F0), Color(0xFF202720), Color(0xFF697067), Color(0xFFE3E5DD), Color(0xFFAE482C))
+    CloudColors(Color.White, Color(0xFF202124), Color(0xFF5F6368), Color(0xFFE8EAED), Color(0xFF0B57D0))
 }
 
 @Composable
@@ -74,7 +77,7 @@ fun TokenCloudApp() {
         (context.getSystemService(Context.POWER_SERVICE) as PowerManager).isPowerSaveMode
     val reduced = motionOff || systemMotionOff || !foreground
     val dark = isSystemInDarkTheme()
-    val colors = if (dark) CloudColors(Color(0xFF151A16), Color(0xFFF0F2E9), Color(0xFFA9B0A5), Color(0xFF30382F), Color(0xFFEDA180))
+    val colors = if (dark) CloudColors(Color(0xFF121316), Color(0xFFE8EAED), Color(0xFF9AA0A6), Color(0xFF303134), Color(0xFFA8C7FA))
         else LocalCloud.current
     fun perform(operation: suspend () -> Unit) {
         if (busy || state.transitioning) return
@@ -109,43 +112,35 @@ fun TokenCloudApp() {
     BackHandler(page != 0) { page = 0 }
     CompositionLocalProvider(LocalCloud provides colors, LocalReducedMotion provides reduced) {
         Column(Modifier.fillMaxSize().background(colors.paper).safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                CloudText("{·}", 25, color = colors.accent, mono = true)
-                Spacer(Modifier.width(12.dp))
-                CloudText("MagicBox", 22, weight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TokenSurface(null, Modifier.size(48.dp), reduced, true) {}
+                CloudText("MagicBox", 20, weight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
-                CloudText(if (BuildConfig.UI_ONLY) "UI / ROOT" else "UNIVERSAL", 10, mono = true, color = colors.muted)
+                CloudText(if (BuildConfig.UI_ONLY) "UI 版" else "通用版", 12, color = colors.muted)
             }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 28.dp, end = 28.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 when (page) {
                     0 -> {
                         item {
-                            Spacer(Modifier.height(8.dp))
-                            CloudText("TOKEN CLOUD / 01", 11, color = colors.muted, mono = true)
-                            Spacer(Modifier.height(17.dp))
-                            CloudText(if (state.running) "连接，在此\n自然发生。" else "自由连接。\n不必复杂。", 39, weight = FontWeight.Light, lineHeight = 49)
-                        }
-                        item { TokenSurface(null, Modifier.fillMaxWidth().height(128.dp), reduced, true) {} }
-                        item {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(7.dp).clip(RoundedCornerShape(4.dp)).background(if (state.running) colors.accent else colors.muted))
-                                Spacer(Modifier.width(9.dp))
-                                CloudText(when (state.phase) {
-                                    Phase.STARTING -> "正在建立连接"
-                                    Phase.STOPPING -> "正在断开"
-                                    Phase.RUNNING -> if (state.mode == ProxyMode.SYSTEM) "本地代理已就绪" else "数据面已就绪"
-                                    Phase.PERMISSION -> "等待 root 与模块授权"
-                                    Phase.ERROR -> "连接尚未就绪"
-                                    Phase.IDLE -> "尚未连接"
-                                }, 13, color = colors.muted)
-                            }
+                            CloudText(when (state.phase) {
+                                Phase.STARTING -> "正在连接"
+                                Phase.STOPPING -> "正在断开"
+                                Phase.RUNNING -> if (state.mode == ProxyMode.SYSTEM) "本地代理已就绪" else "已连接"
+                                Phase.PERMISSION -> "等待授权"
+                                Phase.ERROR -> "连接失败"
+                                Phase.IDLE -> "未连接"
+                            }, 26, weight = FontWeight.Medium)
                             Spacer(Modifier.height(12.dp))
-                            CloudText(state.detail, 13, color = colors.muted, lineHeight = 21)
+                            CloudText(state.detail, 14, color = colors.muted, lineHeight = 22)
+                        }
+                        item {
+                            DetailRow("当前节点", state.selected.ifBlank { "未选择" })
+                            DetailRow("可用节点", "${state.nodes.size} 个")
                         }
                         item {
                             TokenSurface(
-                                if (busy || state.transitioning) "正在处理" else if (state.running) "断开连接  ↗" else if (BuildConfig.UI_ONLY && !state.authorized) "授权并连接模块  ↗" else "建立连接  ↗",
-                                Modifier.fillMaxWidth().height(66.dp), reduced, !busy && !state.transitioning,
+                                if (busy || state.transitioning) "处理中" else if (state.running) "断开连接" else if (BuildConfig.UI_ONLY && !state.authorized) "授权模块" else "连接",
+                                Modifier.fillMaxWidth().height(52.dp), reduced, !busy && !state.transitioning,
                             ) {
                                 perform {
                                     if (state.running) runtime.stop()
@@ -158,48 +153,48 @@ fun TokenCloudApp() {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ProxyMode.entries.forEach { option ->
                                     val available = !BuildConfig.UI_ONLY || option != ProxyMode.SYSTEM
-                                    Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(16.dp))
-                                        .background(if (mode == option) colors.line else Color.Transparent)
+                                    Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(if (mode == option) colors.line.copy(alpha = 0.6f) else Color.Transparent)
+                                        .semantics { selected = mode == option }
                                         .clickable(enabled = available && !state.running && !busy, role = Role.RadioButton) { mode = option }, contentAlignment = Alignment.Center) {
-                                        CloudText(option.title, 13, color = if (available) colors.ink else colors.muted.copy(alpha = 0.45f))
+                                        CloudText(option.title, 13, color = if (available) if (mode == option) colors.accent else colors.muted else colors.muted.copy(alpha = 0.45f))
                                     }
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
                             CloudText(when {
-                                BuildConfig.UI_ONLY -> "仅控制已安装的 MagicNet；本包不含代理内核。"
-                                mode == ProxyMode.SYSTEM -> "监听 127.0.0.1:2080。需在 Wi-Fi 或应用内手动设置代理，不自动接管全部流量。"
-                                mode == ProxyMode.TUN -> "需要 root。与其他透明代理互斥；不会占用系统 VPN 通道。"
-                                else -> "需要 root、兼容内核及 eBPF 能力；检测失败不会悄悄切成 TUN。"
+                                BuildConfig.UI_ONLY -> "需要 root 和已启用的 MagicNet 模块。"
+                                mode == ProxyMode.SYSTEM -> "127.0.0.1:2080 · 需在 Wi-Fi 或应用中手动设置代理。"
+                                mode == ProxyMode.TUN -> "需要 root；请先停止其他透明代理。"
+                                else -> "需要 root 和兼容的 eBPF 内核；检测失败时停止连接。"
                             }, 12, color = colors.muted, lineHeight = 20)
                         }
-                        item { Divider(); DetailRow("当前节点", state.selected.ifBlank { "等待导入" }); DetailRow("可用节点", state.nodes.size.toString().padStart(2, '0')) }
                     }
                     1 -> {
                         item {
-                            CloudText("你的连接集合", 32, weight = FontWeight.Light)
-                            Spacer(Modifier.height(12.dp))
-                            CloudText("粘贴 HTTPS 订阅、节点分享链接，或导入本地配置。内容只在设备与订阅源之间传输。", 14, color = colors.muted, lineHeight = 23)
+                            CloudText("订阅", 24, weight = FontWeight.Medium)
+                            Spacer(Modifier.height(8.dp))
+                            CloudText("粘贴订阅链接或内容，也可以导入文件。", 14, color = colors.muted, lineHeight = 22)
                         }
                         item {
-                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(colors.line.copy(alpha = 0.55f)).padding(20.dp)) {
-                                if (input.isEmpty()) CloudText("https://…\n\n或粘贴订阅内容", 14, color = colors.muted, lineHeight = 25)
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.line.copy(alpha = 0.45f)).padding(16.dp)) {
+                                if (input.isEmpty()) CloudText("https://…", 14, color = colors.muted, lineHeight = 23)
                                 BasicTextField(input, { next ->
                                     if (next.length <= 262144) input = next else message = "较大的订阅请通过文件导入，最大 8 MiB。"
-                                }, Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 260.dp), textStyle = TextStyle(color = colors.ink, fontSize = 14.sp, lineHeight = 23.sp))
+                                }, Modifier.fillMaxWidth().heightIn(min = 128.dp, max = 260.dp), textStyle = TextStyle(color = colors.ink, fontSize = 14.sp, lineHeight = 23.sp))
                             }
                         }
                         item {
-                            TokenSurface(if (busy) "正在解析" else "导入这个集合  ↗", Modifier.fillMaxWidth().height(62.dp), reduced, !busy && !state.running) {
+                            TokenSurface(if (busy) "正在解析" else "导入", Modifier.fillMaxWidth().height(52.dp), reduced, !busy && !state.running) {
                                 perform { runtime.importText(input); input = ""; message = "导入完成。" }
                             }
                             Spacer(Modifier.height(8.dp))
                             TextAction("从文件导入", !busy && !state.running) { filePicker.launch(arrayOf("*/*")) }
-                            if (state.running) CloudText("请先断开连接再替换订阅，避免正在使用的配置被覆盖。", 12, color = colors.muted)
+                            if (state.running) CloudText("断开连接后可更换订阅。", 12, color = colors.muted)
                         }
                         item {
                             Divider()
-                            CloudText("COLLECTION / ${state.nodes.size}", 11, color = colors.muted, mono = true)
+                            CloudText("节点 · ${state.nodes.size}", 13, color = colors.muted)
                         }
                         items(state.nodes, key = { it }) { tag ->
                             Row(Modifier.fillMaxWidth().heightIn(min = 58.dp).clickable(enabled = !busy && !state.running) { perform { runtime.select(tag) } }, verticalAlignment = Alignment.CenterVertically) {
@@ -211,17 +206,16 @@ fun TokenCloudApp() {
                         if (state.nodes.isEmpty()) item { CloudText("导入订阅后，节点会出现在这里。", 13, color = colors.muted, lineHeight = 22) }
                     }
                     else -> {
-                        item { CloudText("简单一点。", 36, weight = FontWeight.Light); Spacer(Modifier.height(12.dp)); CloudText("少一点干扰，多一点掌控。", 14, color = colors.muted) }
+                        item { CloudText("设置", 24, weight = FontWeight.Medium) }
                         item {
                             DetailRow("版本", BuildConfig.VERSION_NAME)
-                            DetailRow("运行方式", if (BuildConfig.UI_ONLY) "MagicNet 模块" else "内置共享内核")
+                            DetailRow("运行方式", if (BuildConfig.UI_ONLY) "MagicNet 模块" else "内置内核")
                             Divider()
-                            TextAction(if (motionOff) "动态效果 · 已减少" else "动态效果 · Token 云集合") {
+                            TextAction(if (motionOff) "动态效果：减少" else "动态效果：开启") {
                                 motionOff = !motionOff
                                 preferences.edit().putBoolean("reduced-motion", motionOff).apply()
                             }
-                            CloudText("点击分裂为字符，再汇聚固化。横向拖动可打散粒子；松手后归位。静止时不持续刷新。", 13, color = colors.muted, lineHeight = 23)
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(16.dp))
                             TextAction("检查运行状态", !busy) { perform { runtime.refresh(true) } }
                             TextAction("停止代理并恢复网络", !busy && !state.transitioning) { perform { runtime.stop() } }
                             if (!BuildConfig.UI_ONLY) TextAction("打开 Wi-Fi 设置") { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
@@ -229,22 +223,17 @@ fun TokenCloudApp() {
                                 message = "MagicBox：AGPL-3.0；sing-box 与 Proxylink 的固定版本、源码和许可证随构建产物一起提供。"
                             }
                         }
-                        item {
-                            Divider()
-                            CloudText("没有账户。没有遥测。\n你的订阅，留在你的设备里。", 18, weight = FontWeight.Light, lineHeight = 30)
-                            Spacer(Modifier.height(20.dp))
-                            CloudText("系统代理并不等于全局代理。root 模式会修改设备路由，首次运行请保留可用的恢复通道。", 12, color = colors.muted, lineHeight = 21)
-                        }
                     }
                 }
                 if (message.isNotBlank()) item { CloudText(message, 14, color = colors.accent, lineHeight = 23); TextAction("关闭提示") { message = "" } }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("连接", "订阅", "设置").forEachIndexed { index, title ->
-                    Box(Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(18.dp))
-                        .background(if (page == index) colors.line else Color.Transparent)
+                    Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(12.dp))
+                        .semantics { contentDescription = "${title}页面"; selected = page == index }
                         .clickable(role = Role.Tab) { page = index }, contentAlignment = Alignment.Center) {
-                        CloudText(title, 14, weight = if (page == index) FontWeight.SemiBold else FontWeight.Normal, color = if (page == index) colors.ink else colors.muted)
+                        CloudText(title, 14, weight = if (page == index) FontWeight.Medium else FontWeight.Normal, color = if (page == index) colors.accent else colors.muted)
                     }
                 }
             }
@@ -265,5 +254,7 @@ private fun CloudText(text: String, size: Int, color: Color = LocalCloud.current
     }
 }
 @Composable private fun TextAction(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    TokenSurface(text, Modifier.fillMaxWidth().heightIn(min = 48.dp), LocalReducedMotion.current, enabled, plain = true, onClick = onClick)
+    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick), contentAlignment = Alignment.CenterStart) {
+        CloudText(text, 14, color = if (enabled) LocalCloud.current.accent else LocalCloud.current.muted)
+    }
 }

@@ -43,11 +43,11 @@ class CloudVisualTest {
         capture("${BuildConfig.FLAVOR}-token-drag")
         compose.mainClock.advanceTimeBy(900)
         compose.mainClock.autoAdvance = true
-        compose.onNodeWithText("订阅", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("订阅页面").performClick()
         capture("${BuildConfig.FLAVOR}-subscriptions")
-        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("设置页面").performClick()
         capture("${BuildConfig.FLAVOR}-settings")
-        compose.onNodeWithText("动态效果 · Token 云集合").performClick()
+        compose.onNodeWithText("动态效果：开启").performClick()
         capture("${BuildConfig.FLAVOR}-reduced-motion")
     }
 }

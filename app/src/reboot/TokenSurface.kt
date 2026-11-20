@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
@@ -73,18 +74,18 @@ internal fun TokenSurface(
         Canvas(Modifier.matchParentSize()) {
             val spread = if (reduced) 0f else maxOf(drag, TokenGeometry.spread(phase.value))
             if (!hero && !plain) drawRoundRect(
-                color = (if (enabled) colors.ink else colors.muted).copy(alpha = (1f - spread) * (1f - spread)),
-                cornerRadius = CornerRadius(22.dp.toPx()),
+                color = (if (enabled) colors.accent else colors.muted).copy(alpha = (1f - spread) * (1f - spread)),
+                cornerRadius = CornerRadius(12.dp.toPx()),
             )
-            if (hero || spread > 0.01f) {
+            if (spread > 0.01f) {
                 paint.color = colors.accent.toArgb()
                 paint.textSize = (if (hero) 11.dp else 10.dp).toPx()
-                repeat(if (plain) 48 else TokenGeometry.COUNT) { index ->
+                repeat(if (plain || hero) 48 else TokenGeometry.COUNT) { index ->
                     val u = TokenGeometry.x(index)
                     val v = TokenGeometry.y(index)
                     val homeX = (0.08f + u * 0.84f) * size.width
                     val homeY = (0.5f + (v - 0.5f) * (if (hero) TokenGeometry.taper(index) * 0.85f else 0.42f)) * size.height
-                    paint.alpha = ((if (hero) 0.22f + v * 0.66f else spread) * 255).toInt().coerceIn(0, 255)
+                    paint.alpha = (spread * 255).toInt().coerceIn(0, 255)
                     drawContext.canvas.nativeCanvas.drawText(
                         TokenGeometry.glyphs[index % TokenGeometry.glyphs.size],
                         homeX + TokenGeometry.dx(index) * size.width * spread,
@@ -94,12 +95,13 @@ internal fun TokenSurface(
                 }
             }
         }
-        if (label != null) BasicText(
-            label,
+        BasicText(
+            label ?: "{·}",
             Modifier.graphicsLayer { alpha = 1f - maxOf(drag, TokenGeometry.spread(phase.value)) },
             style = TextStyle(
-                color = if (plain) if (enabled) colors.accent else colors.muted else colors.paper,
-                fontSize = if (plain) 14.sp else 16.sp,
+                color = if (hero || plain) if (enabled) colors.accent else colors.muted else colors.paper,
+                fontSize = if (hero) 20.sp else if (plain) 14.sp else 16.sp,
+                fontFamily = if (hero) FontFamily.Monospace else FontFamily.SansSerif,
                 lineHeight = 24.sp,
                 fontWeight = if (plain) FontWeight.Normal else FontWeight.SemiBold,
             ),
